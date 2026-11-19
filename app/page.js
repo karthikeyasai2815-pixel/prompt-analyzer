@@ -171,34 +171,40 @@ export default function Home() {
   const verdictMeta = result ? getVerdictBadge(result.verdict, result.score) : null;
 
   return (
-    <div className="min-h-screen bg-[#07070d] relative overflow-hidden text-slate-100 flex flex-col">
-      {/* 1. Aurora Glow & Grid Background */}
-      {/* Subtle faint white dot-grid overlay */}
-      <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none -z-10" />
+    <div className="min-h-screen bg-[#060913] relative overflow-hidden text-slate-100 flex flex-col">
+      {/* 1. Subtle low-opacity dot & line grid pattern overlays */}
+      <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:28px_28px] pointer-events-none -z-10" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:56px_56px] pointer-events-none -z-10 [mask-image:radial-gradient(ellipse_80%_60%_at_50%_20%,#000_60%,transparent_100%)]" />
 
-      {/* Two large blurred ambient gradient orbs */}
-      <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-indigo-600/20 blur-[120px] pointer-events-none -z-10" />
-      <div className="absolute -bottom-40 -right-40 w-[600px] h-[600px] rounded-full bg-fuchsia-600/15 blur-[120px] pointer-events-none -z-10" />
+      {/* 2. Soft, blurred animated radial aurora glow orbs */}
+      {/* Cyan / Indigo Aurora Orb (Top Left) */}
+      <div
+        className="absolute -top-36 -left-36 w-[620px] h-[620px] rounded-full bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.22)_0%,rgba(99,102,241,0.20)_45%,transparent_70%)] blur-[120px] pointer-events-none -z-10 animate-aurora-1 will-change-transform"
+      />
+
+      {/* Violet / Magenta Aurora Orb (Bottom Right) */}
+      <div
+        className="absolute -bottom-36 -right-36 w-[660px] h-[660px] rounded-full bg-[radial-gradient(circle_at_center,rgba(217,70,239,0.18)_0%,rgba(139,92,246,0.20)_45%,transparent_70%)] blur-[130px] pointer-events-none -z-10 animate-aurora-2 will-change-transform"
+      />
 
       {/* Main container */}
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-10 sm:py-16 flex flex-col gap-8 relative z-10">
         {/* Header section */}
-        <header className="text-center flex flex-col items-center gap-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 text-xs font-medium tracking-wide uppercase shadow-[0_0_15px_rgba(99,102,241,0.15)]">
-            <SparklesIcon className="w-3.5 h-3.5 text-indigo-400" />
+        <header className="text-center flex flex-col items-center gap-3.5">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/20 text-cyan-300 text-xs font-semibold tracking-wide uppercase shadow-[0_0_20px_rgba(6,182,212,0.15)]">
+            <SparklesIcon className="w-3.5 h-3.5 text-cyan-400" />
             <span>Powered by Google Gemini</span>
           </div>
-          {/* 3. Gradient Headline */}
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight bg-gradient-to-r from-white via-indigo-200 to-purple-300 bg-clip-text text-transparent">
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight bg-gradient-to-r from-white via-indigo-100 to-purple-200 bg-clip-text text-transparent drop-shadow-sm">
             Prompt Analyzer &amp; Optimizer
           </h1>
-          <p className="text-base sm:text-lg text-slate-400 max-w-2xl leading-relaxed">
+          <p className="text-base sm:text-lg text-slate-300 max-w-2xl leading-relaxed font-normal">
             Elevate your prompts into production-grade instructions. Get an instant score, pinpointed weaknesses, and a masterfully restructured rewrite.
           </p>
         </header>
 
-        {/* 2. Frosted Glass Cards: Main prompt input card */}
-        <section className="bg-white/[0.03] backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] rounded-2xl p-5 sm:p-7 flex flex-col gap-4">
+        {/* Frosted Glass Input Card */}
+        <section className="bg-white/[0.035] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] rounded-2xl p-5 sm:p-7 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <label htmlFor="prompt-input" className="text-sm font-semibold text-slate-200 flex items-center gap-2">
               <span>Your Raw Prompt</span>
@@ -225,7 +231,7 @@ export default function Home() {
               if (error) setError(null);
             }}
             placeholder="Paste or type any prompt here... (e.g. 'Write a blog post about artificial intelligence for beginners with a friendly tone and code examples')"
-            className="w-full bg-black/40 text-slate-100 placeholder-slate-500 text-sm sm:text-base p-4 rounded-xl border border-white/10 focus:outline-none focus:border-indigo-500/80 focus:ring-2 focus:ring-indigo-500/20 transition-all resize-y leading-relaxed font-normal"
+            className="w-full bg-[#060913]/70 backdrop-blur-md text-slate-100 placeholder-slate-500 text-sm sm:text-base p-4 rounded-xl border border-white/15 focus:outline-none focus:border-cyan-400/80 focus:ring-2 focus:ring-cyan-500/20 transition-all resize-y leading-relaxed font-normal shadow-inner"
           />
 
           {/* Quick sample prompt pills */}
@@ -239,7 +245,7 @@ export default function Home() {
                   setPrompt(sample.prompt);
                   if (error) setError(null);
                 }}
-                className="text-xs bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white px-2.5 py-1 rounded-lg border border-white/10 transition-colors cursor-pointer"
+                className="text-xs bg-white/[0.04] hover:bg-white/[0.09] text-slate-300 hover:text-white px-2.5 py-1 rounded-lg border border-white/10 hover:border-white/20 transition-all cursor-pointer"
               >
                 {sample.title}
               </button>
@@ -258,21 +264,21 @@ export default function Home() {
               Clear
             </button>
 
-            {/* 4. Glowing Button */}
+            {/* Glowing Action Button */}
             <button
               type="button"
               onClick={handleAnalyze}
               disabled={isLoading || !prompt.trim()}
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-sm font-semibold shadow-[0_0_25px_rgba(99,102,241,0.4)] hover:shadow-[0_0_35px_rgba(99,102,241,0.6)] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white text-sm font-semibold shadow-[0_0_25px_rgba(6,182,212,0.35)] hover:shadow-[0_0_35px_rgba(99,102,241,0.55)] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
             >
               {isLoading ? (
                 <>
-                  <SpinnerIcon className="w-4 h-4 animate-spin" />
+                  <SpinnerIcon className="w-4 h-4 animate-spin text-cyan-200" />
                   <span>Analyzing &amp; Optimizing...</span>
                 </>
               ) : (
                 <>
-                  <SparklesIcon className="w-4 h-4" />
+                  <SparklesIcon className="w-4 h-4 text-cyan-200" />
                   <span>Analyze &amp; Optimize</span>
                 </>
               )}
@@ -288,14 +294,14 @@ export default function Home() {
           )}
         </section>
 
-        {/* 2. Frosted Glass Cards: Results Section */}
+        {/* Frosted Glass Results Section */}
         {result && (
           <section ref={resultsRef} className="flex flex-col gap-6">
             {/* Score & Verdict Card */}
-            <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div className="bg-white/[0.035] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row items-center justify-between gap-6">
               <div className="flex items-center gap-5 w-full sm:w-auto">
                 {/* Visual Circular/Gauge-like Score display */}
-                <div className="relative flex items-center justify-center w-24 h-24 rounded-2xl bg-black/40 border border-white/10 shadow-inner shrink-0">
+                <div className="relative flex items-center justify-center w-24 h-24 rounded-2xl bg-[#060913]/80 border border-white/15 shadow-inner shrink-0">
                   <div className="flex flex-col items-center">
                     <span className={`text-3xl font-black tracking-tight ${verdictMeta?.textClass}`}>
                       {result.score}
@@ -315,7 +321,7 @@ export default function Home() {
                       {result.verdict}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
                     {result.score >= 80
                       ? "Excellent prompt with strong context, persona, and output instructions."
                       : result.score >= 50
@@ -327,7 +333,7 @@ export default function Home() {
 
               {/* Score Progress Bar */}
               <div className="w-full sm:w-56 flex flex-col gap-1.5">
-                <div className="flex justify-between text-xs text-slate-400 font-medium">
+                <div className="flex justify-between text-xs text-slate-300 font-medium">
                   <span>Prompt Quality</span>
                   <span className={verdictMeta?.textClass}>{result.score}%</span>
                 </div>
@@ -340,11 +346,11 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Mistakes Card */}
-            <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] rounded-2xl p-6 sm:p-7 flex flex-col gap-4">
+            {/* Weaknesses / Mistakes Card */}
+            <div className="bg-white/[0.035] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] rounded-2xl p-6 sm:p-7 flex flex-col gap-4">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-amber-400"></div>
-                <h3 className="text-base font-bold text-slate-200">
+                <div className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></div>
+                <h3 className="text-base font-bold text-white">
                   Detected Weaknesses &amp; Missing Elements
                 </h3>
                 <span className="ml-auto text-xs px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300 font-medium">
@@ -357,7 +363,7 @@ export default function Home() {
                   {result.mistakes.map((mistake, idx) => (
                     <li
                       key={idx}
-                      className="p-3.5 rounded-xl bg-black/30 border border-white/5 text-sm text-slate-300 flex items-start gap-3 leading-relaxed"
+                      className="p-3.5 rounded-xl bg-[#060913]/60 border border-white/10 text-sm text-slate-200 flex items-start gap-3 leading-relaxed"
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-2 shrink-0"></span>
                       <span>{mistake}</span>
@@ -372,11 +378,11 @@ export default function Home() {
             </div>
 
             {/* Optimized Prompt Box */}
-            <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] rounded-2xl overflow-hidden flex flex-col">
+            <div className="bg-white/[0.035] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] rounded-2xl overflow-hidden flex flex-col">
               <div className="p-4 sm:p-5 bg-white/[0.02] border-b border-white/10 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-indigo-400"></div>
-                  <h3 className="text-base font-bold text-slate-200">
+                  <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.6)]"></div>
+                  <h3 className="text-base font-bold text-white">
                     Optimized Production-Ready Prompt
                   </h3>
                 </div>
@@ -387,8 +393,8 @@ export default function Home() {
                   onClick={handleCopy}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                     copied
-                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-                      : "bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 border border-indigo-500/30 hover:text-white"
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
+                      : "bg-cyan-600/20 text-cyan-300 hover:bg-cyan-600/30 border border-cyan-500/30 hover:text-white shadow-[0_0_15px_rgba(6,182,212,0.2)]"
                   }`}
                 >
                   {copied ? (
@@ -405,7 +411,7 @@ export default function Home() {
                 </button>
               </div>
 
-              <div className="p-5 sm:p-6 bg-black/30 text-slate-200 text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-sans selection:bg-indigo-500 selection:text-white">
+              <div className="p-5 sm:p-6 bg-[#060913]/70 text-slate-100 text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-sans selection:bg-cyan-500 selection:text-white">
                 {result.optimizedPrompt}
               </div>
 
