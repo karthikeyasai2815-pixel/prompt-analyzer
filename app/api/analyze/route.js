@@ -1,7 +1,5 @@
 import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 
-export const runtime = "nodejs";
-
 const ANALYSIS_SCHEMA = {
   type: SchemaType.OBJECT,
   properties: {
