@@ -47,7 +47,7 @@ function AlertCircleIcon({ className = "w-5 h-5" }) {
 function SpinnerIcon({ className = "w-5 h-5 animate-spin" }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4}></circle>
       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
     </svg>
   );
@@ -171,21 +171,25 @@ export default function Home() {
   const verdictMeta = result ? getVerdictBadge(result.verdict, result.score) : null;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
-      {/* Background ambient lighting */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[720px] h-[360px] bg-gradient-to-b from-indigo-600/15 via-purple-600/10 to-transparent blur-3xl opacity-70"></div>
-      </div>
+    <div className="min-h-screen bg-[#07070d] relative overflow-hidden text-slate-100 flex flex-col">
+      {/* 1. Aurora Glow & Grid Background */}
+      {/* Subtle faint white dot-grid overlay */}
+      <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none -z-10" />
+
+      {/* Two large blurred ambient gradient orbs */}
+      <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-indigo-600/20 blur-[120px] pointer-events-none -z-10" />
+      <div className="absolute -bottom-40 -right-40 w-[600px] h-[600px] rounded-full bg-fuchsia-600/15 blur-[120px] pointer-events-none -z-10" />
 
       {/* Main container */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-10 sm:py-16 flex flex-col gap-8">
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-10 sm:py-16 flex flex-col gap-8 relative z-10">
         {/* Header section */}
         <header className="text-center flex flex-col items-center gap-3">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-medium tracking-wide uppercase">
-            <SparklesIcon className="w-3.5 h-3.5" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-300 text-xs font-medium tracking-wide uppercase shadow-[0_0_15px_rgba(99,102,241,0.15)]">
+            <SparklesIcon className="w-3.5 h-3.5 text-indigo-400" />
             <span>Powered by Google Gemini</span>
           </div>
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+          {/* 3. Gradient Headline */}
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight bg-gradient-to-r from-white via-indigo-200 to-purple-300 bg-clip-text text-transparent">
             Prompt Analyzer &amp; Optimizer
           </h1>
           <p className="text-base sm:text-lg text-slate-400 max-w-2xl leading-relaxed">
@@ -193,12 +197,12 @@ export default function Home() {
           </p>
         </header>
 
-        {/* Input Card */}
-        <section className="bg-slate-900/90 rounded-2xl border border-slate-800 shadow-2xl p-5 sm:p-7 backdrop-blur-sm flex flex-col gap-4">
+        {/* 2. Frosted Glass Cards: Main prompt input card */}
+        <section className="bg-white/[0.03] backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] rounded-2xl p-5 sm:p-7 flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <label htmlFor="prompt-input" className="text-sm font-semibold text-slate-200 flex items-center gap-2">
               <span>Your Raw Prompt</span>
-              <span className="text-xs text-slate-500 font-normal">({prompt.length} characters)</span>
+              <span className="text-xs text-slate-400 font-normal">({prompt.length} characters)</span>
             </label>
             {prompt.length > 0 && (
               <button
@@ -221,12 +225,12 @@ export default function Home() {
               if (error) setError(null);
             }}
             placeholder="Paste or type any prompt here... (e.g. 'Write a blog post about artificial intelligence for beginners with a friendly tone and code examples')"
-            className="w-full bg-slate-950/80 text-slate-100 placeholder-slate-500 text-sm sm:text-base p-4 rounded-xl border border-slate-800 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all resize-y leading-relaxed font-normal"
+            className="w-full bg-black/40 text-slate-100 placeholder-slate-500 text-sm sm:text-base p-4 rounded-xl border border-white/10 focus:outline-none focus:border-indigo-500/80 focus:ring-2 focus:ring-indigo-500/20 transition-all resize-y leading-relaxed font-normal"
           />
 
           {/* Quick sample prompt pills */}
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            <span className="text-xs font-medium text-slate-500">Try an example:</span>
+            <span className="text-xs font-medium text-slate-400">Try an example:</span>
             {SAMPLE_PROMPTS.map((sample, idx) => (
               <button
                 key={idx}
@@ -235,7 +239,7 @@ export default function Home() {
                   setPrompt(sample.prompt);
                   if (error) setError(null);
                 }}
-                className="text-xs bg-slate-800/80 hover:bg-slate-800 text-slate-300 hover:text-white px-2.5 py-1 rounded-lg border border-slate-700/60 transition-colors cursor-pointer"
+                className="text-xs bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 hover:text-white px-2.5 py-1 rounded-lg border border-white/10 transition-colors cursor-pointer"
               >
                 {sample.title}
               </button>
@@ -243,22 +247,23 @@ export default function Home() {
           </div>
 
           {/* Action buttons */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-2 border-t border-slate-800/80">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-2 border-t border-white/10">
             <button
               type="button"
               onClick={handleClear}
               disabled={isLoading || (!prompt && !result)}
-              className="px-5 py-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+              className="px-5 py-2.5 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] text-slate-300 hover:text-white text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
             >
               <ClearIcon className="w-4 h-4" />
               Clear
             </button>
 
+            {/* 4. Glowing Button */}
             <button
               type="button"
               onClick={handleAnalyze}
               disabled={isLoading || !prompt.trim()}
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-sm font-semibold shadow-lg shadow-indigo-600/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer hover:shadow-indigo-500/35 active:scale-[0.99]"
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-sm font-semibold shadow-[0_0_25px_rgba(99,102,241,0.4)] hover:shadow-[0_0_35px_rgba(99,102,241,0.6)] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
             >
               {isLoading ? (
                 <>
@@ -276,26 +281,26 @@ export default function Home() {
 
           {/* Error Banner */}
           {error && (
-            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-start gap-2.5 animate-fadeIn">
+            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-sm flex items-start gap-2.5">
               <AlertCircleIcon className="w-5 h-5 shrink-0 text-rose-400 mt-0.5" />
               <div className="flex-1">{error}</div>
             </div>
           )}
         </section>
 
-        {/* Results Section */}
+        {/* 2. Frosted Glass Cards: Results Section */}
         {result && (
-          <section ref={resultsRef} className="flex flex-col gap-6 animate-fadeIn">
+          <section ref={resultsRef} className="flex flex-col gap-6">
             {/* Score & Verdict Card */}
-            <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-6 sm:p-7 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row items-center justify-between gap-6">
               <div className="flex items-center gap-5 w-full sm:w-auto">
                 {/* Visual Circular/Gauge-like Score display */}
-                <div className="relative flex items-center justify-center w-24 h-24 rounded-2xl bg-slate-950 border border-slate-800 shadow-inner shrink-0">
+                <div className="relative flex items-center justify-center w-24 h-24 rounded-2xl bg-black/40 border border-white/10 shadow-inner shrink-0">
                   <div className="flex flex-col items-center">
                     <span className={`text-3xl font-black tracking-tight ${verdictMeta?.textClass}`}>
                       {result.score}
                     </span>
-                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
                       / 100
                     </span>
                   </div>
@@ -326,7 +331,7 @@ export default function Home() {
                   <span>Prompt Quality</span>
                   <span className={verdictMeta?.textClass}>{result.score}%</span>
                 </div>
-                <div className="w-full h-2.5 rounded-full bg-slate-800 overflow-hidden">
+                <div className="w-full h-2.5 rounded-full bg-white/10 overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-700 ease-out ${verdictMeta?.barClass}`}
                     style={{ width: `${Math.min(100, Math.max(0, result.score))}%` }}
@@ -336,13 +341,13 @@ export default function Home() {
             </div>
 
             {/* Mistakes Card */}
-            <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-6 sm:p-7 shadow-xl flex flex-col gap-4">
+            <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] rounded-2xl p-6 sm:p-7 flex flex-col gap-4">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-amber-400"></div>
                 <h3 className="text-base font-bold text-slate-200">
                   Detected Weaknesses &amp; Missing Elements
                 </h3>
-                <span className="ml-auto text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-medium">
+                <span className="ml-auto text-xs px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300 font-medium">
                   {result.mistakes?.length || 0} issues found
                 </span>
               </div>
@@ -352,7 +357,7 @@ export default function Home() {
                   {result.mistakes.map((mistake, idx) => (
                     <li
                       key={idx}
-                      className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 text-sm text-slate-300 flex items-start gap-3 leading-relaxed"
+                      className="p-3.5 rounded-xl bg-black/30 border border-white/5 text-sm text-slate-300 flex items-start gap-3 leading-relaxed"
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-2 shrink-0"></span>
                       <span>{mistake}</span>
@@ -367,8 +372,8 @@ export default function Home() {
             </div>
 
             {/* Optimized Prompt Box */}
-            <div className="bg-slate-900/90 rounded-2xl border border-slate-800 shadow-xl overflow-hidden flex flex-col">
-              <div className="p-4 sm:p-5 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-4">
+            <div className="bg-white/[0.03] backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] rounded-2xl overflow-hidden flex flex-col">
+              <div className="p-4 sm:p-5 bg-white/[0.02] border-b border-white/10 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-indigo-400"></div>
                   <h3 className="text-base font-bold text-slate-200">
@@ -400,11 +405,11 @@ export default function Home() {
                 </button>
               </div>
 
-              <div className="p-5 sm:p-6 bg-slate-950/90 text-slate-200 text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-sans selection:bg-indigo-500 selection:text-white">
+              <div className="p-5 sm:p-6 bg-black/30 text-slate-200 text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-sans selection:bg-indigo-500 selection:text-white">
                 {result.optimizedPrompt}
               </div>
 
-              <div className="p-3 bg-slate-900/60 border-t border-slate-800/80 px-5 flex items-center justify-between text-xs text-slate-500">
+              <div className="p-3 bg-white/[0.02] border-t border-white/10 px-5 flex items-center justify-between text-xs text-slate-400">
                 <span>Structured with role, context, task, constraints, and output format</span>
                 <span>{result.optimizedPrompt?.length || 0} characters</span>
               </div>
@@ -414,7 +419,7 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full border-t border-slate-900 py-6 text-center text-xs text-slate-500">
+      <footer className="w-full border-t border-white/5 py-6 text-center text-xs text-slate-500 relative z-10">
         Prompt Analyzer &amp; Optimizer &bull; Built with Next.js, Tailwind CSS &amp; Google Gemini
       </footer>
     </div>
