@@ -14,7 +14,7 @@ const ANALYSIS_SCHEMA = {
     },
     mistakes: {
       type: SchemaType.ARRAY,
-      description: "List of missing elements, weaknesses, or mistakes (e.g. missing role/persona, lack of context, vague instructions, undefined output format).",
+      description: "List of missing elements, weaknesses, or mistakes.",
       items: {
         type: SchemaType.STRING,
       },
@@ -87,13 +87,50 @@ function cleanJsonText(rawText) {
   return text;
 }
 
-// 1. Gemini provider
+function normalizeResult(raw, originalPrompt) {
+  const score =
+    typeof raw?.score === "number"
+      ? Math.max(0, Math.min(100, Math.round(raw.score)))
+      : 70;
+
+  const verdict =
+    raw?.verdict === "Good" ||
+    raw?.verdict === "Average" ||
+    raw?.verdict === "Needs Improvement"
+      ? raw.verdict
+      : score >= 80
+      ? "Good"
+      : score >= 50
+      ? "Average"
+      : "Needs Improvement";
+
+  const issues = Array.isArray(raw?.weaknesses)
+    ? raw.weaknesses
+    : Array.isArray(raw?.mistakes)
+    ? raw.mistakes
+    : ["Missing explicit constraints and clear output formatting."];
+
+  const optimizedPrompt =
+    typeof raw?.optimizedPrompt === "string" && raw.optimizedPrompt.trim().length > 0
+      ? raw.optimizedPrompt.trim()
+      : typeof raw?.optimized_prompt === "string" && raw.optimized_prompt.trim().length > 0
+      ? raw.optimized_prompt.trim()
+      : originalPrompt;
+
+  return {
+    score,
+    verdict,
+    weaknesses: issues,
+    mistakes: issues,
+    optimizedPrompt,
+  };
+}
+
+// 1. Gemini: gemini-2.5-flash via GEMINI_API_KEY
 async function analyzeWithGemini(prompt) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error(
-      "GEMINI_API_KEY is not configured. Please set GEMINI_API_KEY in your .env.local file."
-    );
+    throw new Error("GEMINI_API_KEY is not configured.");
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
@@ -101,7 +138,6 @@ async function analyzeWithGemini(prompt) {
     "gemini-2.5-flash",
     "gemini-3.8-flash",
     "gemini-3.5-flash-lite",
-    "gemini-3.1-flash-lite",
     "gemini-2.0-flash",
     "gemini-1.5-flash",
   ];
@@ -123,8 +159,9 @@ async function analyzeWithGemini(prompt) {
       const promptInput = `Please analyze and optimize this prompt:\n\n"""\n${prompt.trim()}\n"""`;
       const result = await model.generateContent(promptInput);
       const responseText = result.response.text();
-      const cleanedJson = cleanJsonText(responseText);
-      return JSON.parse(cleanedJson);
+      const cleaned = cleanJsonText(responseText);
+      const parsed = JSON.parse(cleaned);
+      return normalizeResult(parsed, prompt);
     } catch (err) {
       lastError = err;
       continue;
@@ -134,16 +171,14 @@ async function analyzeWithGemini(prompt) {
   throw lastError || new Error("Failed to analyze prompt with Gemini API.");
 }
 
-// 2. ChatGPT (OpenAI) provider
+// 2. ChatGPT: gpt-4o-mini via OPENAI_API_KEY
 async function analyzeWithChatGPT(prompt) {
   const apiKey =
     process.env.OPENAI_API_KEY ||
     "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";
 
   if (!apiKey) {
-    throw new Error(
-      "OPENAI_API_KEY is not configured. Please set OPENAI_API_KEY in your .env.local file."
-    );
+    throw new Error("OPENAI_API_KEY is not configured.");
   }
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -182,22 +217,22 @@ async function analyzeWithChatGPT(prompt) {
   const data = await response.json();
   const rawText = data?.choices?.[0]?.message?.content || "";
   const cleaned = cleanJsonText(rawText);
-  return JSON.parse(cleaned);
+  const parsed = JSON.parse(cleaned);
+  return normalizeResult(parsed, prompt);
 }
 
-// 3. Claude (Anthropic) provider
+// 3. Claude: claude-sonnet-4-20250514 via ANTHROPIC_API_KEY
 async function analyzeWithClaude(prompt) {
   const apiKey =
     process.env.ANTHROPIC_API_KEY ||
     "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";
 
   if (!apiKey) {
-    throw new Error(
-      "ANTHROPIC_API_KEY is not configured. Please set ANTHROPIC_API_KEY in your .env.local file."
-    );
+    throw new Error("ANTHROPIC_API_KEY is not configured.");
   }
 
   const modelsToTry = [
+    "claude-sonnet-4-20250514",
     "claude-sonnet-5-5",
     "claude-haiku-5-5",
     "claude-3-5-sonnet-20241022",
@@ -238,7 +273,6 @@ async function analyzeWithClaude(prompt) {
           errorData?.error?.message ||
           `Anthropic API returned status ${response.status}: ${response.statusText}`;
 
-        // If model not found or invalid model identifier, try fallback
         if (response.status === 404 || errMsg.toLowerCase().includes("model")) {
           lastError = new Error(errMsg);
           continue;
@@ -249,7 +283,8 @@ async function analyzeWithClaude(prompt) {
       const data = await response.json();
       const rawText = data?.content?.[0]?.text || "";
       const cleaned = cleanJsonText(rawText);
-      return JSON.parse(cleaned);
+      const parsed = JSON.parse(cleaned);
+      return normalizeResult(parsed, prompt);
     } catch (err) {
       lastError = err;
       if (
@@ -265,6 +300,108 @@ async function analyzeWithClaude(prompt) {
   throw lastError || new Error("Failed to analyze prompt with Claude API.");
 }
 
+// 4. Best Prompt Judge: Gemini evaluates the candidates against clarity, specificity, and effectiveness
+async function judgeBestPrompt(rawPrompt, successfulModels) {
+  if (!successfulModels || successfulModels.length === 0) {
+    throw new Error("No successful model outputs to judge.");
+  }
+
+  // If only 1 model succeeded, that model wins automatically
+  if (successfulModels.length === 1) {
+    const single = successfulModels[0];
+    return {
+      winner: single.provider,
+      winnerName: single.name,
+      reason: `Evaluated as the strongest optimized prompt with a quality score of ${single.data.score}/100.`,
+      optimizedPrompt: single.data.optimizedPrompt,
+      score: single.data.score,
+      verdict: single.data.verdict,
+      weaknesses: single.data.weaknesses,
+    };
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (apiKey) {
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const modelsToTry = [
+      "gemini-2.5-flash",
+      "gemini-3.8-flash",
+      "gemini-2.0-flash",
+      "gemini-1.5-flash",
+    ];
+
+    const candidatesList = successfulModels
+      .map(
+        (m, idx) =>
+          `[CANDIDATE ${idx + 1}: ${m.name} (id: ${m.provider}, score: ${m.data.score})]\n${m.data.optimizedPrompt}`
+      )
+      .join("\n\n");
+
+    const judgePrompt = `Original Raw Prompt:\n"""\n${rawPrompt.trim()}\n"""\n\nCandidate Optimized Prompts from Different Models:\n${candidatesList}\n\nEvaluate all candidates against clarity, specificity, and effectiveness. Select the single best prompt and provide a concise 1-2 sentence explanation of why it won. Return JSON only:`;
+
+    for (const modelName of modelsToTry) {
+      try {
+        const judgeModel = genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.1,
+          },
+          systemInstruction: `You are an elite Prompt Engineering Judge.
+Evaluate candidate prompts on clarity, specificity, and effectiveness.
+Select the single Overall Best Prompt among the candidates.
+Provide a clear 1-2 sentence reason explaining why it won over the others.
+
+Return strict JSON:
+{
+  "winner": "gemini" | "chatgpt" | "claude",
+  "winnerName": "Gemini" | "ChatGPT" | "Claude",
+  "reason": "1-2 sentences explaining why this prompt won against clarity, specificity, and effectiveness."
+}`,
+        });
+
+        const result = await judgeModel.generateContent(judgePrompt);
+        const text = result.response.text();
+        const parsed = JSON.parse(cleanJsonText(text));
+
+        const chosenWinnerKey = (parsed.winner || "").toLowerCase();
+        const winningEntry =
+          successfulModels.find((m) => m.provider === chosenWinnerKey) ||
+          successfulModels.find((m) => m.name.toLowerCase() === (parsed.winnerName || "").toLowerCase()) ||
+          successfulModels[0];
+
+        return {
+          winner: winningEntry.provider,
+          winnerName: winningEntry.name,
+          reason:
+            parsed.reason ||
+            `${winningEntry.name}'s prompt excelled with superior clarity, contextual boundaries, and structural precision.`,
+          optimizedPrompt: winningEntry.data.optimizedPrompt,
+          score: winningEntry.data.score,
+          verdict: winningEntry.data.verdict,
+          weaknesses: winningEntry.data.weaknesses,
+        };
+      } catch (err) {
+        console.warn(`Judge attempt with ${modelName} failed, trying next:`, err.message);
+        continue;
+      }
+    }
+  }
+
+  // Fallback heuristic judge if Gemini judge is unavailable: highest score
+  const sorted = [...successfulModels].sort((a, b) => (b.data.score || 0) - (a.data.score || 0));
+  const top = sorted[0];
+  return {
+    winner: top.provider,
+    winnerName: top.name,
+    reason: `${top.name}'s version earned the highest prompt precision score (${top.data.score}/100) with well-defined constraints and optimal task framing.`,
+    optimizedPrompt: top.data.optimizedPrompt,
+    score: top.data.score,
+    verdict: top.data.verdict,
+    weaknesses: top.data.weaknesses,
+  };
+}
+
 export async function POST(req) {
   try {
     let body;
@@ -277,7 +414,7 @@ export async function POST(req) {
       );
     }
 
-    const { prompt, provider = "gemini" } = body || {};
+    const { prompt } = body || {};
 
     if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
       return Response.json(
@@ -286,64 +423,94 @@ export async function POST(req) {
       );
     }
 
-    const selectedProvider = (provider || "gemini").toString().trim().toLowerCase();
+    const trimmedPrompt = prompt.trim();
 
-    let analysisResult = null;
+    // 1. Backend Parallel Comparison: Run Gemini, ChatGPT, and Claude simultaneously using Promise.allSettled
+    const [geminiResult, chatgptResult, claudeResult] = await Promise.allSettled([
+      analyzeWithGemini(trimmedPrompt),
+      analyzeWithChatGPT(trimmedPrompt),
+      analyzeWithClaude(trimmedPrompt),
+    ]);
 
-    if (selectedProvider === "chatgpt" || selectedProvider === "openai") {
-      analysisResult = await analyzeWithChatGPT(prompt);
-    } else if (selectedProvider === "claude" || selectedProvider === "anthropic") {
-      analysisResult = await analyzeWithClaude(prompt);
-    } else {
-      analysisResult = await analyzeWithGemini(prompt);
+    const modelsData = {
+      gemini:
+        geminiResult.status === "fulfilled"
+          ? { ...geminiResult.value, status: "success" }
+          : {
+              status: "error",
+              error: geminiResult.reason?.message || "Failed to analyze with Gemini",
+              score: 0,
+              verdict: "Needs Improvement",
+              weaknesses: ["Gemini service or API key was unavailable."],
+              optimizedPrompt: trimmedPrompt,
+            },
+      chatgpt:
+        chatgptResult.status === "fulfilled"
+          ? { ...chatgptResult.value, status: "success" }
+          : {
+              status: "error",
+              error: chatgptResult.reason?.message || "Failed to analyze with ChatGPT",
+              score: 0,
+              verdict: "Needs Improvement",
+              weaknesses: ["ChatGPT service or API key was unavailable."],
+              optimizedPrompt: trimmedPrompt,
+            },
+      claude:
+        claudeResult.status === "fulfilled"
+          ? { ...claudeResult.value, status: "success" }
+          : {
+              status: "error",
+              error: claudeResult.reason?.message || "Failed to analyze with Claude",
+              score: 0,
+              verdict: "Needs Improvement",
+              weaknesses: ["Claude service or API key was unavailable."],
+              optimizedPrompt: trimmedPrompt,
+            },
+    };
+
+    // Gather successfully completed model outputs
+    const successfulModels = [];
+    if (geminiResult.status === "fulfilled") {
+      successfulModels.push({ provider: "gemini", name: "Gemini", data: geminiResult.value });
+    }
+    if (chatgptResult.status === "fulfilled") {
+      successfulModels.push({ provider: "chatgpt", name: "ChatGPT", data: chatgptResult.value });
+    }
+    if (claudeResult.status === "fulfilled") {
+      successfulModels.push({ provider: "claude", name: "Claude", data: claudeResult.value });
     }
 
-    if (!analysisResult) {
+    // If all three models failed, return graceful error
+    if (successfulModels.length === 0) {
       return Response.json(
-        { error: `Failed to receive analysis from ${selectedProvider}.` },
+        {
+          error:
+            "All AI providers failed to analyze the prompt. Please check your API keys (GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY) in .env.local.",
+          models: modelsData,
+        },
         { status: 502 }
       );
     }
 
-    // Normalize output so all providers return the exact same JSON structure
-    const score =
-      typeof analysisResult.score === "number"
-        ? Math.max(0, Math.min(100, Math.round(analysisResult.score)))
-        : 70;
-
-    const verdict =
-      analysisResult.verdict === "Good" ||
-      analysisResult.verdict === "Average" ||
-      analysisResult.verdict === "Needs Improvement"
-        ? analysisResult.verdict
-        : score >= 80
-        ? "Good"
-        : score >= 50
-        ? "Average"
-        : "Needs Improvement";
-
-    const issues = Array.isArray(analysisResult.weaknesses)
-      ? analysisResult.weaknesses
-      : Array.isArray(analysisResult.mistakes)
-      ? analysisResult.mistakes
-      : ["Missing explicit constraints and clear output formatting."];
-
-    const optimizedPrompt =
-      typeof analysisResult.optimizedPrompt === "string" &&
-      analysisResult.optimizedPrompt.trim().length > 0
-        ? analysisResult.optimizedPrompt.trim()
-        : typeof analysisResult.optimized_prompt === "string" &&
-          analysisResult.optimized_prompt.trim().length > 0
-        ? analysisResult.optimized_prompt.trim()
-        : prompt;
+    // 2. Best Prompt Judge: Gemini evaluates the generated prompts against clarity, specificity, and effectiveness
+    const bestVerdict = await judgeBestPrompt(trimmedPrompt, successfulModels);
 
     return Response.json(
       {
-        score,
-        verdict,
-        weaknesses: issues,
-        mistakes: issues,
-        optimizedPrompt,
+        best: {
+          winner: bestVerdict.winner,
+          winnerName: bestVerdict.winnerName,
+          reason: bestVerdict.reason,
+          optimizedPrompt: bestVerdict.optimizedPrompt,
+          score: bestVerdict.score,
+        },
+        models: modelsData,
+        // Backward-compatible fields
+        score: bestVerdict.score,
+        verdict: bestVerdict.verdict || (bestVerdict.score >= 80 ? "Good" : "Average"),
+        weaknesses: bestVerdict.weaknesses || [],
+        mistakes: bestVerdict.weaknesses || [],
+        optimizedPrompt: bestVerdict.optimizedPrompt,
       },
       { status: 200 }
     );
