@@ -1,46 +1,67 @@
 @import "tailwindcss";
 
 :root {
-  --background: #060913;
-  --foreground: #f1f5f9;
+  --background: #131314;
+  --foreground: #e3e3e8;
 }
 
 body {
-  background: #060913;
-  color: #f1f5f9;
+  background: var(--background);
+  color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
   overflow-x: hidden;
 }
 
-/* Smooth floating animations for aurora glow orbs */
-@keyframes float-aurora-1 {
+/* Gemini-style subtle ambient glow — fixed behind content center */
+.gemini-ambient-glow {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(
+      ellipse 60% 50% at 50% 38%,
+      rgba(66, 133, 244, 0.08) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 50% 45% at 55% 42%,
+      rgba(155, 114, 203, 0.08) 0%,
+      transparent 65%
+    );
+}
+
+/* Smooth floating animations for subtle glow drift */
+@keyframes glow-drift {
   0%, 100% {
-    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.85;
+    transform: scale(1);
   }
-  33% {
-    transform: translate3d(50px, 45px, 0) scale(1.08);
-  }
-  66% {
-    transform: translate3d(-35px, 25px, 0) scale(0.95);
-  }
-}
-
-@keyframes float-aurora-2 {
-  0%, 100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  33% {
-    transform: translate3d(-55px, -45px, 0) scale(0.94);
-  }
-  66% {
-    transform: translate3d(35px, -55px, 0) scale(1.06);
+  50% {
+    opacity: 1;
+    transform: scale(1.03);
   }
 }
 
-.animate-aurora-1 {
-  animation: float-aurora-1 20s ease-in-out infinite;
+.animate-glow-drift {
+  animation: glow-drift 12s ease-in-out infinite;
 }
 
-.animate-aurora-2 {
-  animation: float-aurora-2 24s ease-in-out infinite alternate;
+/* Custom scrollbar for dark mode */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #131314;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a2a2e;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3a40;
 }

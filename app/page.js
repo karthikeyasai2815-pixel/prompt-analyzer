@@ -67,8 +67,8 @@ const SAMPLE_PROMPTS = [
     prompt: "Write a blog post about artificial intelligence in 2026.",
   },
   {
-    title: "Salary Negotiation",
-    prompt: "Write an email to my manager asking for a salary raise.",
+    title: "Photo Edit",
+    prompt: "Make this photo aesthetic with warm tones and soft lighting.",
   },
 ];
 
@@ -171,50 +171,38 @@ export default function Home() {
   const verdictMeta = result ? getVerdictBadge(result.verdict, result.score) : null;
 
   return (
-    <div className="min-h-screen bg-[#060913] relative overflow-hidden text-slate-100 flex flex-col">
-      {/* 1. Subtle low-opacity dot & line grid pattern overlays */}
-      <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:28px_28px] pointer-events-none -z-10" />
-      <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:56px_56px] pointer-events-none -z-10 [mask-image:radial-gradient(ellipse_80%_60%_at_50%_20%,#000_60%,transparent_100%)]" />
-
-      {/* 2. Soft, blurred animated radial aurora glow orbs */}
-      {/* Cyan / Indigo Aurora Orb (Top Left) */}
-      <div
-        className="absolute -top-36 -left-36 w-[620px] h-[620px] rounded-full bg-[radial-gradient(circle_at_center,rgba(6,182,212,0.22)_0%,rgba(99,102,241,0.20)_45%,transparent_70%)] blur-[120px] pointer-events-none -z-10 animate-aurora-1 will-change-transform"
-      />
-
-      {/* Violet / Magenta Aurora Orb (Bottom Right) */}
-      <div
-        className="absolute -bottom-36 -right-36 w-[660px] h-[660px] rounded-full bg-[radial-gradient(circle_at_center,rgba(217,70,239,0.18)_0%,rgba(139,92,246,0.20)_45%,transparent_70%)] blur-[130px] pointer-events-none -z-10 animate-aurora-2 will-change-transform"
-      />
+    <div className="min-h-screen bg-[#131314] relative overflow-hidden text-slate-100 flex flex-col">
+      {/* Gemini-style ambient glow layer */}
+      <div className="gemini-ambient-glow animate-glow-drift" />
 
       {/* Main container */}
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-10 sm:py-16 flex flex-col gap-8 relative z-10">
         {/* Header section */}
         <header className="text-center flex flex-col items-center gap-3.5">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-400/20 text-cyan-300 text-xs font-semibold tracking-wide uppercase shadow-[0_0_20px_rgba(6,182,212,0.15)]">
-            <SparklesIcon className="w-5 h-5 text-cyan-400" />
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs font-semibold tracking-wide uppercase">
+            <SparklesIcon className="w-5 h-5 text-blue-400" />
             <span>Powered by Google Gemini</span>
           </div>
-          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight bg-gradient-to-r from-white via-indigo-100 to-purple-200 bg-clip-text text-transparent drop-shadow-sm">
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent drop-shadow-sm">
             Prompt Analyzer &amp; Optimizer
           </h1>
-          <p className="text-base sm:text-lg text-slate-300 max-w-2xl leading-relaxed font-normal">
+          <p className="text-base sm:text-lg text-[#9aa0a6] max-w-2xl leading-relaxed font-normal">
             Elevate your prompts into production-grade instructions. Get an instant score, pinpointed weaknesses, and a masterfully restructured rewrite.
           </p>
         </header>
 
-        {/* Frosted Glass Input Card */}
-        <section className="bg-white/[0.035] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] rounded-2xl p-5 sm:p-7 flex flex-col gap-4">
+        {/* Input Card */}
+        <section className="bg-[#1e1f20] border border-[#303134] rounded-2xl p-5 sm:p-7 flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <label htmlFor="prompt-input" className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+            <label htmlFor="prompt-input" className="text-sm font-semibold text-[#e3e3e8] flex items-center gap-2">
               <span>Your Raw Prompt</span>
-              <span className="text-xs text-slate-400 font-normal">({prompt.length} characters)</span>
+              <span className="text-xs text-[#9aa0a6] font-normal">({prompt.length} characters)</span>
             </label>
             {prompt.length > 0 && (
               <button
                 type="button"
                 onClick={handleClear}
-                className="text-xs text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1 cursor-pointer"
+                className="text-xs text-[#9aa0a6] hover:text-[#e3e3e8] transition-colors flex items-center gap-1 cursor-pointer"
               >
                 <ClearIcon className="w-5 h-5" />
                 Clear
@@ -230,13 +218,13 @@ export default function Home() {
               setPrompt(e.target.value);
               if (error) setError(null);
             }}
-            placeholder="Paste or type any prompt here... (e.g. 'Write a blog post about artificial intelligence for beginners with a friendly tone and code examples')"
-            className="w-full bg-[#060913]/70 backdrop-blur-md text-slate-100 placeholder-slate-500 text-sm sm:text-base p-4 rounded-xl border border-white/15 focus:outline-none focus:border-cyan-400/80 focus:ring-2 focus:ring-cyan-500/20 transition-all resize-y leading-relaxed font-normal shadow-inner"
+            placeholder={"Paste or type any prompt here...\n(e.g. 'Write a blog post about AI' or 'Make this photo aesthetic with warm tones')"}
+            className="w-full bg-[#131314] text-[#e3e3e8] placeholder-[#5f6368] text-sm sm:text-base p-4 rounded-xl border border-[#303134] focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 transition-all resize-y leading-relaxed font-normal"
           />
 
           {/* Quick sample prompt pills */}
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            <span className="text-xs font-medium text-slate-400">Try an example:</span>
+            <span className="text-xs font-medium text-[#9aa0a6]">Try an example:</span>
             {SAMPLE_PROMPTS.map((sample, idx) => (
               <button
                 key={idx}
@@ -245,7 +233,7 @@ export default function Home() {
                   setPrompt(sample.prompt);
                   if (error) setError(null);
                 }}
-                className="text-xs bg-white/[0.04] hover:bg-white/[0.09] text-slate-300 hover:text-white px-2.5 py-1 rounded-lg border border-white/10 hover:border-white/20 transition-all cursor-pointer"
+                className="text-xs bg-[#303134]/60 hover:bg-[#303134] text-[#bdc1c6] hover:text-white px-2.5 py-1 rounded-lg border border-[#3c4043] hover:border-[#5f6368] transition-all cursor-pointer"
               >
                 {sample.title}
               </button>
@@ -253,32 +241,32 @@ export default function Home() {
           </div>
 
           {/* Action buttons */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-2 border-t border-white/10">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-2 border-t border-[#303134]">
             <button
               type="button"
               onClick={handleClear}
               disabled={isLoading || (!prompt && !result)}
-              className="px-5 py-2.5 rounded-xl border border-white/10 bg-white/[0.02] hover:bg-white/[0.06] text-slate-300 hover:text-white text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+              className="px-5 py-2.5 rounded-xl border border-[#303134] bg-[#131314] hover:bg-[#282a2c] text-[#bdc1c6] hover:text-white text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
             >
               <ClearIcon className="w-5 h-5" />
               Clear
             </button>
 
-            {/* Glowing Action Button */}
+            {/* Primary Action Button */}
             <button
               type="button"
               onClick={handleAnalyze}
               disabled={isLoading || !prompt.trim()}
-              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white text-sm font-semibold shadow-[0_0_25px_rgba(6,182,212,0.35)] hover:shadow-[0_0_35px_rgba(99,102,241,0.55)] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+              className="px-6 py-2.5 rounded-xl bg-[#4285f4] hover:bg-[#5a95f5] text-white text-sm font-semibold shadow-[0_2px_12px_rgba(66,133,244,0.3)] hover:shadow-[0_4px_20px_rgba(66,133,244,0.45)] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
             >
               {isLoading ? (
                 <>
-                  <SpinnerIcon className="w-5 h-5 animate-spin text-cyan-200" />
+                  <SpinnerIcon className="w-5 h-5 animate-spin text-blue-100" />
                   <span>Analyzing &amp; Optimizing...</span>
                 </>
               ) : (
                 <>
-                  <SparklesIcon className="w-5 h-5 text-cyan-200" />
+                  <SparklesIcon className="w-5 h-5 text-blue-100" />
                   <span>Analyze &amp; Optimize</span>
                 </>
               )}
@@ -294,26 +282,26 @@ export default function Home() {
           )}
         </section>
 
-        {/* Frosted Glass Results Section */}
+        {/* Results Section */}
         {result && (
           <section ref={resultsRef} className="flex flex-col gap-6">
             {/* Score & Verdict Card */}
-            <div className="bg-white/[0.035] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div className="bg-[#1e1f20] border border-[#303134] rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row items-center justify-between gap-6">
               <div className="flex items-center gap-5 w-full sm:w-auto">
-                {/* Visual Circular/Gauge-like Score display */}
-                <div className="relative flex items-center justify-center w-24 h-24 rounded-2xl bg-[#060913]/80 border border-white/15 shadow-inner shrink-0">
+                {/* Visual Score display */}
+                <div className="relative flex items-center justify-center w-24 h-24 rounded-2xl bg-[#131314] border border-[#303134] shrink-0">
                   <div className="flex flex-col items-center">
                     <span className={`text-3xl font-black tracking-tight ${verdictMeta?.textClass}`}>
                       {result.score}
                     </span>
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest">
+                    <span className="text-[10px] font-semibold text-[#9aa0a6] uppercase tracking-widest">
                       / 100
                     </span>
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5 flex-1">
-                  <span className="text-xs uppercase tracking-wider text-slate-400 font-semibold">
+                  <span className="text-xs uppercase tracking-wider text-[#9aa0a6] font-semibold">
                     Overall Readiness
                   </span>
                   <div className="flex items-center gap-3">
@@ -321,7 +309,7 @@ export default function Home() {
                       {result.verdict}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-300 mt-0.5 leading-relaxed">
+                  <p className="text-xs text-[#bdc1c6] mt-0.5 leading-relaxed">
                     {result.score >= 80
                       ? "Excellent prompt with strong context, persona, and output instructions."
                       : result.score >= 50
@@ -333,11 +321,11 @@ export default function Home() {
 
               {/* Score Progress Bar */}
               <div className="w-full sm:w-56 flex flex-col gap-1.5">
-                <div className="flex justify-between text-xs text-slate-300 font-medium">
+                <div className="flex justify-between text-xs text-[#bdc1c6] font-medium">
                   <span>Prompt Quality</span>
                   <span className={verdictMeta?.textClass}>{result.score}%</span>
                 </div>
-                <div className="w-full h-2.5 rounded-full bg-white/10 overflow-hidden">
+                <div className="w-full h-2.5 rounded-full bg-[#303134] overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-700 ease-out ${verdictMeta?.barClass}`}
                     style={{ width: `${Math.min(100, Math.max(0, result.score))}%` }}
@@ -347,13 +335,13 @@ export default function Home() {
             </div>
 
             {/* Weaknesses / Mistakes Card */}
-            <div className="bg-white/[0.035] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] rounded-2xl p-6 sm:p-7 flex flex-col gap-4">
+            <div className="bg-[#1e1f20] border border-[#303134] rounded-2xl p-6 sm:p-7 flex flex-col gap-4">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></div>
                 <h3 className="text-base font-bold text-white">
                   Detected Weaknesses &amp; Missing Elements
                 </h3>
-                <span className="ml-auto text-xs px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300 font-medium">
+                <span className="ml-auto text-xs px-2.5 py-0.5 rounded-full bg-[#303134] text-[#bdc1c6] font-medium">
                   {result.mistakes?.length || 0} issues found
                 </span>
               </div>
@@ -363,7 +351,7 @@ export default function Home() {
                   {result.mistakes.map((mistake, idx) => (
                     <li
                       key={idx}
-                      className="p-3.5 rounded-xl bg-[#060913]/60 border border-white/10 text-sm text-slate-200 flex items-start gap-3 leading-relaxed"
+                      className="p-3.5 rounded-xl bg-[#131314] border border-[#303134] text-sm text-[#e3e3e8] flex items-start gap-3 leading-relaxed"
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-2 shrink-0"></span>
                       <span>{mistake}</span>
@@ -378,10 +366,10 @@ export default function Home() {
             </div>
 
             {/* Optimized Prompt Box */}
-            <div className="bg-white/[0.035] backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)] rounded-2xl overflow-hidden flex flex-col">
-              <div className="p-4 sm:p-5 bg-white/[0.02] border-b border-white/10 flex items-center justify-between gap-4">
+            <div className="bg-[#1e1f20] border border-[#303134] rounded-2xl overflow-hidden flex flex-col">
+              <div className="p-4 sm:p-5 bg-[#282a2c] border-b border-[#303134] flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.6)]"></div>
+                  <div className="w-2 h-2 rounded-full bg-[#4285f4] shadow-[0_0_8px_rgba(66,133,244,0.6)]"></div>
                   <h3 className="text-base font-bold text-white">
                     Optimized Production-Ready Prompt
                   </h3>
@@ -393,8 +381,8 @@ export default function Home() {
                   onClick={handleCopy}
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                     copied
-                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.3)]"
-                      : "bg-cyan-600/20 text-cyan-300 hover:bg-cyan-600/30 border border-cyan-500/30 hover:text-white shadow-[0_0_15px_rgba(6,182,212,0.2)]"
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                      : "bg-[#4285f4]/15 text-[#8ab4f8] hover:bg-[#4285f4]/25 border border-[#4285f4]/30 hover:text-white"
                   }`}
                 >
                   {copied ? (
@@ -411,11 +399,11 @@ export default function Home() {
                 </button>
               </div>
 
-              <div className="p-5 sm:p-6 bg-[#060913]/70 text-slate-100 text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-sans selection:bg-cyan-500 selection:text-white">
+              <div className="p-5 sm:p-6 bg-[#131314] text-[#e3e3e8] text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-sans selection:bg-blue-500/40 selection:text-white">
                 {result.optimizedPrompt}
               </div>
 
-              <div className="p-3 bg-white/[0.02] border-t border-white/10 px-5 flex items-center justify-between text-xs text-slate-400">
+              <div className="p-3 bg-[#282a2c] border-t border-[#303134] px-5 flex items-center justify-between text-xs text-[#9aa0a6]">
                 <span>Structured with role, context, task, constraints, and output format</span>
                 <span>{result.optimizedPrompt?.length || 0} characters</span>
               </div>
@@ -425,7 +413,7 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full border-t border-white/5 py-6 text-center text-xs text-slate-500 relative z-10">
+      <footer className="w-full border-t border-[#303134] py-6 text-center text-xs text-[#9aa0a6] relative z-10">
         Prompt Analyzer &amp; Optimizer &bull; Built with Next.js, Tailwind CSS &amp; Google Gemini
       </footer>
     </div>
