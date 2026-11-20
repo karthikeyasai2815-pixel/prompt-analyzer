@@ -74,6 +74,7 @@ const SAMPLE_PROMPTS = [
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
+  const [provider, setProvider] = useState("gemini"); // 'gemini' | 'chatgpt' | 'claude'
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
@@ -94,7 +95,7 @@ export default function Home() {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: trimmed }),
+        body: JSON.stringify({ prompt: trimmed, provider }),
       });
 
       const data = await response.json();
@@ -169,6 +170,7 @@ export default function Home() {
   };
 
   const verdictMeta = result ? getVerdictBadge(result.verdict, result.score) : null;
+  const issuesList = result ? (result.weaknesses || result.mistakes || []) : [];
 
   return (
     <div className="min-h-screen bg-[#131314] relative overflow-hidden text-slate-100 flex flex-col">
@@ -181,7 +183,7 @@ export default function Home() {
         <header className="text-center flex flex-col items-center gap-3.5">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs font-semibold tracking-wide uppercase">
             <SparklesIcon className="w-5 h-5 text-blue-400" />
-            <span>Powered by Google Gemini</span>
+            <span>AI Prompt Studio • {provider === "chatgpt" ? "ChatGPT (OpenAI)" : provider === "claude" ? "Claude (Anthropic)" : "Google Gemini"}</span>
           </div>
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent drop-shadow-sm">
             Prompt Analyzer &amp; Optimizer
@@ -193,21 +195,72 @@ export default function Home() {
 
         {/* Input Card */}
         <section className="bg-[#1e1f20] border border-[#303134] rounded-2xl p-5 sm:p-7 flex flex-col gap-4">
-          <div className="flex items-center justify-between">
+          {/* Header row with Prompt label and Pill-shaped Model Selector */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <label htmlFor="prompt-input" className="text-sm font-semibold text-[#e3e3e8] flex items-center gap-2">
               <span>Your Raw Prompt</span>
               <span className="text-xs text-[#9aa0a6] font-normal">({prompt.length} characters)</span>
             </label>
-            {prompt.length > 0 && (
-              <button
-                type="button"
-                onClick={handleClear}
-                className="text-xs text-[#9aa0a6] hover:text-[#e3e3e8] transition-colors flex items-center gap-1 cursor-pointer"
+
+            {/* Clean pill-shaped model selector next to the prompt bar */}
+            <div className="flex items-center gap-3">
+              <div
+                className="inline-flex items-center p-1 rounded-full bg-[#131314] border border-[#303134] shadow-inner text-xs"
+                role="radiogroup"
+                aria-label="Select AI Model"
               >
-                <ClearIcon className="w-5 h-5" />
-                Clear
-              </button>
-            )}
+                <button
+                  type="button"
+                  onClick={() => setProvider("gemini")}
+                  className={`px-3 py-1 rounded-full font-medium transition-all cursor-pointer ${
+                    provider === "gemini"
+                      ? "bg-[#4285f4] text-white shadow-sm font-semibold"
+                      : "text-[#9aa0a6] hover:text-[#e3e3e8]"
+                  }`}
+                  aria-checked={provider === "gemini"}
+                  role="radio"
+                >
+                  Gemini
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProvider("chatgpt")}
+                  className={`px-3 py-1 rounded-full font-medium transition-all cursor-pointer ${
+                    provider === "chatgpt"
+                      ? "bg-[#10a37f] text-white shadow-sm font-semibold"
+                      : "text-[#9aa0a6] hover:text-[#e3e3e8]"
+                  }`}
+                  aria-checked={provider === "chatgpt"}
+                  role="radio"
+                >
+                  ChatGPT
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProvider("claude")}
+                  className={`px-3 py-1 rounded-full font-medium transition-all cursor-pointer ${
+                    provider === "claude"
+                      ? "bg-[#d97706] text-white shadow-sm font-semibold"
+                      : "text-[#9aa0a6] hover:text-[#e3e3e8]"
+                  }`}
+                  aria-checked={provider === "claude"}
+                  role="radio"
+                >
+                  Claude
+                </button>
+              </div>
+
+              {prompt.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="text-xs text-[#9aa0a6] hover:text-[#e3e3e8] transition-colors flex items-center gap-1 cursor-pointer"
+                >
+                  <ClearIcon className="w-5 h-5" />
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
 
           <textarea
@@ -241,36 +294,45 @@ export default function Home() {
           </div>
 
           {/* Action buttons */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 pt-2 border-t border-[#303134]">
-            <button
-              type="button"
-              onClick={handleClear}
-              disabled={isLoading || (!prompt && !result)}
-              className="px-5 py-2.5 rounded-xl border border-[#303134] bg-[#131314] hover:bg-[#282a2c] text-[#bdc1c6] hover:text-white text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <ClearIcon className="w-5 h-5" />
-              Clear
-            </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-[#303134]">
+            <div className="flex items-center gap-2 text-xs text-[#9aa0a6]">
+              <span>Active Model:</span>
+              <span className="font-semibold text-[#e3e3e8] capitalize">
+                {provider === "chatgpt" ? "ChatGPT (gpt-4o-mini)" : provider === "claude" ? "Claude (Anthropic)" : "Gemini"}
+              </span>
+            </div>
 
-            {/* Primary Action Button */}
-            <button
-              type="button"
-              onClick={handleAnalyze}
-              disabled={isLoading || !prompt.trim()}
-              className="px-6 py-2.5 rounded-xl bg-[#4285f4] hover:bg-[#5a95f5] text-white text-sm font-semibold shadow-[0_2px_12px_rgba(66,133,244,0.3)] hover:shadow-[0_4px_20px_rgba(66,133,244,0.45)] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
-            >
-              {isLoading ? (
-                <>
-                  <SpinnerIcon className="w-5 h-5 animate-spin text-blue-100" />
-                  <span>Analyzing &amp; Optimizing...</span>
-                </>
-              ) : (
-                <>
-                  <SparklesIcon className="w-5 h-5 text-blue-100" />
-                  <span>Analyze &amp; Optimize</span>
-                </>
-              )}
-            </button>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleClear}
+                disabled={isLoading || (!prompt && !result)}
+                className="px-5 py-2.5 rounded-xl border border-[#303134] bg-[#131314] hover:bg-[#282a2c] text-[#bdc1c6] hover:text-white text-sm font-medium transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <ClearIcon className="w-5 h-5" />
+                Clear
+              </button>
+
+              {/* Primary Action Button */}
+              <button
+                type="button"
+                onClick={handleAnalyze}
+                disabled={isLoading || !prompt.trim()}
+                className="px-6 py-2.5 rounded-xl bg-[#4285f4] hover:bg-[#5a95f5] text-white text-sm font-semibold shadow-[0_2px_12px_rgba(66,133,244,0.3)] hover:shadow-[0_4px_20px_rgba(66,133,244,0.45)] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+              >
+                {isLoading ? (
+                  <>
+                    <SpinnerIcon className="w-5 h-5 animate-spin text-blue-100" />
+                    <span>Analyzing with {provider === "chatgpt" ? "ChatGPT" : provider === "claude" ? "Claude" : "Gemini"}...</span>
+                  </>
+                ) : (
+                  <>
+                    <SparklesIcon className="w-5 h-5 text-blue-100" />
+                    <span>Analyze &amp; Optimize</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
 
           {/* Error Banner */}
@@ -342,19 +404,19 @@ export default function Home() {
                   Detected Weaknesses &amp; Missing Elements
                 </h3>
                 <span className="ml-auto text-xs px-2.5 py-0.5 rounded-full bg-[#303134] text-[#bdc1c6] font-medium">
-                  {result.mistakes?.length || 0} issues found
+                  {issuesList.length} issues found
                 </span>
               </div>
 
-              {result.mistakes && result.mistakes.length > 0 ? (
+              {issuesList.length > 0 ? (
                 <ul className="grid grid-cols-1 gap-2.5">
-                  {result.mistakes.map((mistake, idx) => (
+                  {issuesList.map((weakness, idx) => (
                     <li
                       key={idx}
                       className="p-3.5 rounded-xl bg-[#131314] border border-[#303134] text-sm text-[#e3e3e8] flex items-start gap-3 leading-relaxed"
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-2 shrink-0"></span>
-                      <span>{mistake}</span>
+                      <span>{weakness}</span>
                     </li>
                   ))}
                 </ul>
@@ -414,7 +476,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="w-full border-t border-[#303134] py-6 text-center text-xs text-[#9aa0a6] relative z-10">
-        Prompt Analyzer &amp; Optimizer &bull; Built with Next.js, Tailwind CSS &amp; Google Gemini
+        Prompt Analyzer &amp; Optimizer &bull; Built with Next.js, Tailwind CSS &amp; Multi-Model AI (Gemini, ChatGPT, Claude)
       </footer>
     </div>
   );

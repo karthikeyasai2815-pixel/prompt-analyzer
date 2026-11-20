@@ -19,6 +19,13 @@ const ANALYSIS_SCHEMA = {
         type: SchemaType.STRING,
       },
     },
+    weaknesses: {
+      type: SchemaType.ARRAY,
+      description: "List of missing elements, weaknesses, or mistakes.",
+      items: {
+        type: SchemaType.STRING,
+      },
+    },
     optimizedPrompt: {
       type: SchemaType.STRING,
       description: "The rewritten, production-grade, highly structured version of the prompt using professional prompt engineering best practices.",
@@ -65,18 +72,197 @@ Rewrite the optimizedPrompt as a clear, structured prompt with:
 Return a strict JSON object with:
 - score (0 to 100)
 - verdict ("Good", "Average", or "Needs Improvement")
-- mistakes (array of strings listing missing or weak elements)
+- weaknesses (array of strings listing missing or weak elements)
+- mistakes (same array of strings)
 - optimizedPrompt (the rewritten prompt following the rules above for the detected category)
 `;
 
 function cleanJsonText(rawText) {
-  let text = rawText.trim();
+  let text = (rawText || "").trim();
   if (text.startsWith("```json")) {
     text = text.replace(/^```json\s*/, "").replace(/```\s*$/, "").trim();
   } else if (text.startsWith("```")) {
     text = text.replace(/^```\s*/, "").replace(/```\s*$/, "").trim();
   }
   return text;
+}
+
+// 1. Gemini provider
+async function analyzeWithGemini(prompt) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error(
+      "GEMINI_API_KEY is not configured. Please set GEMINI_API_KEY in your .env.local file."
+    );
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const modelsToTry = [
+    "gemini-2.5-flash",
+    "gemini-3.8-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+  ];
+
+  let lastError = null;
+
+  for (const modelName of modelsToTry) {
+    try {
+      const model = genAI.getGenerativeModel({
+        model: modelName,
+        generationConfig: {
+          responseMimeType: "application/json",
+          responseSchema: ANALYSIS_SCHEMA,
+          temperature: 0.2,
+        },
+        systemInstruction: SYSTEM_INSTRUCTION,
+      });
+
+      const promptInput = `Please analyze and optimize this prompt:\n\n"""\n${prompt.trim()}\n"""`;
+      const result = await model.generateContent(promptInput);
+      const responseText = result.response.text();
+      const cleanedJson = cleanJsonText(responseText);
+      return JSON.parse(cleanedJson);
+    } catch (err) {
+      lastError = err;
+      continue;
+    }
+  }
+
+  throw lastError || new Error("Failed to analyze prompt with Gemini API.");
+}
+
+// 2. ChatGPT (OpenAI) provider
+async function analyzeWithChatGPT(prompt) {
+  const apiKey =
+    process.env.OPENAI_API_KEY ||
+    "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";
+
+  if (!apiKey) {
+    throw new Error(
+      "OPENAI_API_KEY is not configured. Please set OPENAI_API_KEY in your .env.local file."
+    );
+  }
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content:
+            SYSTEM_INSTRUCTION +
+            '\n\nYou MUST return a strict JSON object matching: {"score": number, "verdict": "Good"|"Average"|"Needs Improvement", "weaknesses": string[], "mistakes": string[], "optimizedPrompt": string}',
+        },
+        {
+          role: "user",
+          content: `Please analyze and optimize this prompt:\n\n"""\n${prompt.trim()}\n"""`,
+        },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    throw new Error(
+      errorData?.error?.message ||
+        `OpenAI API returned status ${response.status}: ${response.statusText}`
+    );
+  }
+
+  const data = await response.json();
+  const rawText = data?.choices?.[0]?.message?.content || "";
+  const cleaned = cleanJsonText(rawText);
+  return JSON.parse(cleaned);
+}
+
+// 3. Claude (Anthropic) provider
+async function analyzeWithClaude(prompt) {
+  const apiKey =
+    process.env.ANTHROPIC_API_KEY ||
+    "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";
+
+  if (!apiKey) {
+    throw new Error(
+      "ANTHROPIC_API_KEY is not configured. Please set ANTHROPIC_API_KEY in your .env.local file."
+    );
+  }
+
+  const modelsToTry = [
+    "claude-sonnet-5-5",
+    "claude-haiku-5-5",
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-haiku-20241022",
+    "claude-3-haiku-20240307",
+  ];
+
+  let lastError = null;
+
+  for (const model of modelsToTry) {
+    try {
+      const response = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 2048,
+          system:
+            SYSTEM_INSTRUCTION +
+            '\n\nYou MUST return ONLY a valid JSON object matching: {"score": number, "verdict": "Good"|"Average"|"Needs Improvement", "weaknesses": string[], "mistakes": string[], "optimizedPrompt": string}. Output no text outside the JSON.',
+          messages: [
+            {
+              role: "user",
+              content: `Please analyze and optimize this prompt:\n\n"""\n${prompt.trim()}\n"""\n\nReturn strict JSON:`,
+            },
+          ],
+          temperature: 0.2,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const errMsg =
+          errorData?.error?.message ||
+          `Anthropic API returned status ${response.status}: ${response.statusText}`;
+
+        // If model not found or invalid model identifier, try fallback
+        if (response.status === 404 || errMsg.toLowerCase().includes("model")) {
+          lastError = new Error(errMsg);
+          continue;
+        }
+        throw new Error(errMsg);
+      }
+
+      const data = await response.json();
+      const rawText = data?.content?.[0]?.text || "";
+      const cleaned = cleanJsonText(rawText);
+      return JSON.parse(cleaned);
+    } catch (err) {
+      lastError = err;
+      if (
+        err.message &&
+        (err.message.toLowerCase().includes("model") || err.message.includes("404"))
+      ) {
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw lastError || new Error("Failed to analyze prompt with Claude API.");
 }
 
 export async function POST(req) {
@@ -91,7 +277,7 @@ export async function POST(req) {
       );
     }
 
-    const { prompt } = body || {};
+    const { prompt, provider = "gemini" } = body || {};
 
     if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
       return Response.json(
@@ -100,85 +286,71 @@ export async function POST(req) {
       );
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return Response.json(
-        {
-          error:
-            "GEMINI_API_KEY is not configured. Please set GEMINI_API_KEY in your .env.local file.",
-        },
-        { status: 500 }
-      );
-    }
+    const selectedProvider = (provider || "gemini").toString().trim().toLowerCase();
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-
-    // Primary model is gemini-2.5-flash as requested; fallbacks ensure resilience across environments
-    const modelsToTry = [
-      "gemini-2.5-flash",
-      "gemini-3.8-flash",
-      "gemini-3.5-flash-lite",
-      "gemini-3.1-flash-lite",
-      "gemini-2.0-flash",
-      "gemini-1.5-flash",
-    ];
-
-    let lastError = null;
     let analysisResult = null;
 
-    for (const modelName of modelsToTry) {
-      try {
-        const model = genAI.getGenerativeModel({
-          model: modelName,
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: ANALYSIS_SCHEMA,
-            temperature: 0.2,
-          },
-          systemInstruction: SYSTEM_INSTRUCTION,
-        });
-
-        const promptInput = `Please analyze and optimize this prompt:\n\n"""\n${prompt.trim()}\n"""`;
-        const result = await model.generateContent(promptInput);
-        const responseText = result.response.text();
-
-        const cleanedJson = cleanJsonText(responseText);
-        const parsed = JSON.parse(cleanedJson);
-
-        // Validate expected keys
-        if (
-          typeof parsed.score === "number" &&
-          typeof parsed.verdict === "string" &&
-          Array.isArray(parsed.mistakes) &&
-          typeof parsed.optimizedPrompt === "string"
-        ) {
-          analysisResult = parsed;
-          break;
-        }
-      } catch (err) {
-        lastError = err;
-        // Continue to fallback model if this model failed (e.g. 404 deprecated or 503 capacity)
-        continue;
-      }
+    if (selectedProvider === "chatgpt" || selectedProvider === "openai") {
+      analysisResult = await analyzeWithChatGPT(prompt);
+    } else if (selectedProvider === "claude" || selectedProvider === "anthropic") {
+      analysisResult = await analyzeWithClaude(prompt);
+    } else {
+      analysisResult = await analyzeWithGemini(prompt);
     }
 
     if (!analysisResult) {
-      console.error("Gemini API error:", lastError);
       return Response.json(
-        {
-          error:
-            lastError?.message ||
-            "Failed to analyze prompt with Gemini API. Please check your API key and quota.",
-        },
+        { error: `Failed to receive analysis from ${selectedProvider}.` },
         { status: 502 }
       );
     }
 
-    return Response.json(analysisResult, { status: 200 });
-  } catch (error) {
-    console.error("Unexpected error in /api/analyze:", error);
+    // Normalize output so all providers return the exact same JSON structure
+    const score =
+      typeof analysisResult.score === "number"
+        ? Math.max(0, Math.min(100, Math.round(analysisResult.score)))
+        : 70;
+
+    const verdict =
+      analysisResult.verdict === "Good" ||
+      analysisResult.verdict === "Average" ||
+      analysisResult.verdict === "Needs Improvement"
+        ? analysisResult.verdict
+        : score >= 80
+        ? "Good"
+        : score >= 50
+        ? "Average"
+        : "Needs Improvement";
+
+    const issues = Array.isArray(analysisResult.weaknesses)
+      ? analysisResult.weaknesses
+      : Array.isArray(analysisResult.mistakes)
+      ? analysisResult.mistakes
+      : ["Missing explicit constraints and clear output formatting."];
+
+    const optimizedPrompt =
+      typeof analysisResult.optimizedPrompt === "string" &&
+      analysisResult.optimizedPrompt.trim().length > 0
+        ? analysisResult.optimizedPrompt.trim()
+        : typeof analysisResult.optimized_prompt === "string" &&
+          analysisResult.optimized_prompt.trim().length > 0
+        ? analysisResult.optimized_prompt.trim()
+        : prompt;
+
     return Response.json(
-      { error: "An unexpected server error occurred." },
+      {
+        score,
+        verdict,
+        weaknesses: issues,
+        mistakes: issues,
+        optimizedPrompt,
+      },
+      { status: 200 }
+    );
+  } catch (error) {
+    console.error("Error in /api/analyze:", error);
+    return Response.json(
+      { error: error?.message || "An unexpected server error occurred." },
       { status: 500 }
     );
   }
