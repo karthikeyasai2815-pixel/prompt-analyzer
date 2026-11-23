@@ -99,22 +99,27 @@ function sanitizeWeaknesses(list, fallback = ["Missing explicit constraints and 
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-function isOverloadedOrRateLimited(err) {
+function is503Error(err) {
   if (!err) return false;
   const status = err.status || err.statusCode || err.response?.status;
-  if (status === 503 || status === 429) return true;
+  if (status === 503) return true;
   const msg = String(err.message || err).toLowerCase();
   return (
+    msg.includes('"code":503') ||
+    msg.includes('"code": 503') ||
     msg.includes("503") ||
-    msg.includes("429") ||
-    msg.includes("overloaded") ||
     msg.includes("high demand") ||
-    msg.includes("rate limit") ||
-    msg.includes("resource has been exhausted") ||
-    msg.includes("resource_exhausted") ||
-    msg.includes("temporarily unavailable") ||
-    msg.includes("service unavailable")
+    msg.includes("spikes in demand") ||
+    msg.includes("unavailable") ||
+    msg.includes("overloaded")
   );
+}
+
+function getErrorDetails(err) {
+  if (!err) return { status: "UNKNOWN", message: "Unknown error" };
+  const status = err.status || err.statusCode || err.response?.status || "UNKNOWN";
+  const message = err.message || String(err);
+  return { status, message };
 }
 
 export async function POST(req) {
@@ -151,11 +156,14 @@ export async function POST(req) {
       );
     }
 
-    // Active fallback list: gemini-3.8-flash, gemini-3.5-flash-lite, gemini-flash-latest
+    // Verified Gemini models: requested models (gemini-2.5-flash, gemini-2.5-pro) + verified active models from v1beta
     const modelsToTry = [
-      "gemini-3.8-flash",
+      "gemini-2.5-flash",
+      "gemini-2.5-pro",
+      "gemini-3.5-flash",
       "gemini-3.5-flash-lite",
-      "gemini-flash-latest",
+      "gemini-3-flash-preview",
+      "gemini-3.8-flash",
     ];
 
     let lastError = null;
@@ -163,79 +171,108 @@ export async function POST(req) {
 
     const userPromptPayload = `Analyze and optimize this raw prompt across Gemini, ChatGPT, and Claude:\n\n"""\n${trimmedPrompt}\n"""\n\nGenerate the three model-specific prompt optimizations (Gemini concise & context-rich; ChatGPT clear persona & bulleted rules; Claude structured with <instructions> and <context> XML tags), individual quality scores, weaknesses, and select the Best Overall Prompt winner. Return strict JSON.`;
 
-    // Loop through fallback models with automatic 503/429 retry
-    for (let i = 0; i < modelsToTry.length; i++) {
-      const modelName = modelsToTry[i];
-      try {
-        let responseText = null;
+    // 2-attempt exponential backoff retry on 503 errors (wait 2s, then 4s) before switching models
+    const BACKOFF_DELAYS = [2000, 4000];
 
-        // Try official @google/genai SDK
+    modelLoop: for (const modelName of modelsToTry) {
+      for (let attempt = 0; attempt <= BACKOFF_DELAYS.length; attempt++) {
         try {
-          const ai = new GoogleGenAI({ apiKey });
-          const response = await ai.models.generateContent({
-            model: modelName,
-            contents: userPromptPayload,
-            config: {
-              systemInstruction: SYSTEM_INSTRUCTION,
-              responseMimeType: "application/json",
-              temperature: 0.2,
-            },
-          });
-          responseText = response?.text;
-        } catch (genAiErr) {
-          // If high demand / rate limited, rethrow immediately to trigger 1s wait and next model
-          if (isOverloadedOrRateLimited(genAiErr)) {
-            throw genAiErr;
-          }
-          // Otherwise try @google/generative-ai SDK as alternative fallback caller
-          const genAI = new GoogleGenerativeAI(apiKey);
-          const model = genAI.getGenerativeModel({
-            model: modelName,
-            generationConfig: {
-              responseMimeType: "application/json",
-              temperature: 0.2,
-            },
-            systemInstruction: SYSTEM_INSTRUCTION,
-          });
-          const result = await model.generateContent(userPromptPayload);
-          responseText = result.response.text();
-        }
+          let responseText = null;
 
-        if (responseText) {
-          const cleaned = cleanJsonText(responseText);
-          parsedResult = JSON.parse(cleaned);
-          if (parsedResult && parsedResult.models && parsedResult.best) {
-            // Succeeded with this model
+          // Call via official @google/genai SDK
+          try {
+            const ai = new GoogleGenAI({ apiKey });
+            const response = await ai.models.generateContent({
+              model: modelName,
+              contents: userPromptPayload,
+              config: {
+                systemInstruction: SYSTEM_INSTRUCTION,
+                responseMimeType: "application/json",
+                temperature: 0.2,
+              },
+            });
+            responseText = response?.text;
+          } catch (genAiErr) {
+            const { status, message } = getErrorDetails(genAiErr);
+            // Log the exact raw Google API error
+            console.error(
+              `[Google API Error] Model: "${modelName}" (Attempt ${attempt + 1}) | Status: ${status} | Raw Error:`,
+              message
+            );
+
+            // If 503 overload, rethrow to trigger the exponential backoff retry
+            if (is503Error(genAiErr)) {
+              throw genAiErr;
+            }
+
+            // If 404 model name issue or not found, do not retry same model; switch models immediately
+            if (
+              status === 404 ||
+              String(message).includes("404") ||
+              String(message).includes("NOT_FOUND")
+            ) {
+              lastError = genAiErr;
+              break;
+            }
+
+            // Try fallback SDK
+            const genAI = new GoogleGenerativeAI(apiKey);
+            const model = genAI.getGenerativeModel({
+              model: modelName,
+              generationConfig: {
+                responseMimeType: "application/json",
+                temperature: 0.2,
+              },
+              systemInstruction: SYSTEM_INSTRUCTION,
+            });
+            const result = await model.generateContent(userPromptPayload);
+            responseText = result.response.text();
+          }
+
+          if (responseText) {
+            const cleaned = cleanJsonText(responseText);
+            parsedResult = JSON.parse(cleaned);
+            if (parsedResult && parsedResult.models && parsedResult.best) {
+              break modelLoop; // Succeeded!
+            }
+          }
+        } catch (err) {
+          lastError = err;
+          const { status, message } = getErrorDetails(err);
+          const is503 = is503Error(err);
+
+          // Log the exact raw Google API error in console.error
+          console.error(
+            `[Google API Error] Model: "${modelName}" | Status: ${status} | Is 503 Overload: ${is503} | Raw Error:`,
+            message
+          );
+
+          // 2-attempt exponential backoff retry (waiting 2s, then 4s) on 503 errors before switching models
+          if (is503 && attempt < BACKOFF_DELAYS.length) {
+            const delayMs = BACKOFF_DELAYS[attempt];
+            console.warn(
+              `[503 Backoff] Model "${modelName}" experienced high demand (503). Retrying attempt ${attempt + 1}/${BACKOFF_DELAYS.length} in ${delayMs / 1000}s...`
+            );
+            await sleep(delayMs);
+            continue;
+          } else {
+            // Non-503 error (e.g. 404 model name issue) or retries exhausted: switch to next model
             break;
           }
-        }
-      } catch (err) {
-        lastError = err;
-        const isTemporary = isOverloadedOrRateLimited(err);
-        console.warn(
-          `Gemini model ${modelName} failed (${isTemporary ? "503/429 high demand" : err.message}).`
-        );
-
-        // If 503 (high demand/overloaded) or 429, wait 1 second before trying the next model
-        if (isTemporary && i < modelsToTry.length - 1) {
-          console.warn(
-            `Waiting 1s before attempting next fallback model (${modelsToTry[i + 1]})...`
-          );
-          await sleep(1000);
         }
       }
     }
 
     // Only return an error if all models in the fallback list fail
     if (!parsedResult || !parsedResult.models) {
-      console.error("All Gemini fallback models failed:", lastError);
-      const isOverload = isOverloadedOrRateLimited(lastError);
+      console.error("All Gemini models failed:", lastError);
+      const isOverload = is503Error(lastError);
       return Response.json(
         {
           error: isOverload
             ? "Gemini models are currently experiencing high demand. Please try again in a few moments."
             : lastError?.message ||
-              "Failed to analyze and optimize prompt. All fallback models failed.",
+              "Failed to analyze and optimize prompt. All models failed.",
         },
         { status: isOverload ? 503 : 502 }
       );
