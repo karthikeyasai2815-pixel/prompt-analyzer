@@ -2,27 +2,11 @@
 
 import React, { useState, useRef } from "react";
 
-// Clean inline SVG icons with explicit width/height so they never render oversized
+// Clean inline SVG icons with explicit width/height classes and attributes
 function SparklesIcon({ className = "w-5 h-5" }) {
   return (
     <svg className={className} width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-    </svg>
-  );
-}
-
-function TrophyIcon({ className = "w-5 h-5" }) {
-  return (
-    <svg className={className} width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8 21h8m-4-4v4m-5-8.5C7 8.5 7 4 7 4h10s0 4.5-2 8.5c-1.2 2.4-3 3.5-3 3.5s-1.8-1.1-3-3.5zM7 6H4a2 2 0 00-2 2v1c0 2.2 1.8 4 4 4h1m10-7h3a2 2 0 012 2v1c0 2.2-1.8 4-4 4h-1" />
-    </svg>
-  );
-}
-
-function CrownIcon({ className = "w-5 h-5" }) {
-  return (
-    <svg className={className} width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3 18h18M4 8l4 6 4-8 4 8 4-6v10H4V8z" />
     </svg>
   );
 }
@@ -93,8 +77,7 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
-  const [copiedBest, setCopiedBest] = useState(false);
-  const [copiedModels, setCopiedModels] = useState({});
+  const [copied, setCopied] = useState(false);
   const resultsRef = useRef(null);
 
   const handleAnalyze = async () => {
@@ -106,8 +89,7 @@ export default function Home() {
 
     setIsLoading(true);
     setError(null);
-    setCopiedBest(false);
-    setCopiedModels({});
+    setCopied(false);
 
     try {
       const response = await fetch("/api/analyze", {
@@ -138,11 +120,11 @@ export default function Home() {
     setPrompt("");
     setResult(null);
     setError(null);
-    setCopiedBest(false);
-    setCopiedModels({});
+    setCopied(false);
   };
 
-  const copyToClipboard = async (text, onCopied) => {
+  const handleCopy = async () => {
+    const text = result?.optimizedPrompt;
     if (!text) return;
     try {
       if (navigator?.clipboard?.writeText) {
@@ -155,81 +137,41 @@ export default function Home() {
         document.execCommand("copy");
         document.body.removeChild(textarea);
       }
-      onCopied();
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error("Clipboard copy failed:", err);
     }
   };
 
-  const handleCopyBest = () => {
-    const text = result?.best?.optimizedPrompt || result?.optimizedPrompt;
-    copyToClipboard(text, () => {
-      setCopiedBest(true);
-      setTimeout(() => setCopiedBest(false), 2000);
-    });
-  };
-
-  const handleCopyModel = (modelKey, text) => {
-    copyToClipboard(text, () => {
-      setCopiedModels((prev) => ({ ...prev, [modelKey]: true }));
-      setTimeout(() => {
-        setCopiedModels((prev) => ({ ...prev, [modelKey]: false }));
-      }, 2000);
-    });
-  };
-
-  // Helper for score badges
-  const getScoreBadge = (score) => {
-    if (score >= 80) {
+  // Verdict badge colors
+  const getVerdictBadge = (verdict, score) => {
+    if (verdict === "Good" || score >= 80) {
       return {
-        bg: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
-        label: `${score}/100`,
-        tag: "Excellent",
+        label: "Good",
+        badgeClass: "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30",
+        barClass: "bg-emerald-500",
+        textClass: "text-emerald-400",
       };
     }
-    if (score >= 50) {
+    if (verdict === "Average" || (score >= 50 && score < 80)) {
       return {
-        bg: "bg-amber-500/15 text-amber-400 border border-amber-500/30",
-        label: `${score}/100`,
-        tag: "Good",
+        label: "Average",
+        badgeClass: "bg-amber-500/15 text-amber-400 border border-amber-500/30",
+        barClass: "bg-amber-500",
+        textClass: "text-amber-400",
       };
     }
     return {
-      bg: "bg-rose-500/15 text-rose-400 border border-rose-500/30",
-      label: `${score}/100`,
-      tag: "Needs Polish",
+      label: "Needs Improvement",
+      badgeClass: "bg-rose-500/15 text-rose-400 border border-rose-500/30",
+      barClass: "bg-rose-500",
+      textClass: "text-rose-400",
     };
   };
 
-  const modelConfigs = [
-    {
-      key: "gemini",
-      name: "Gemini",
-      modelTag: "gemini-2.5-flash",
-      brandColor: "#4285f4",
-      accentBg: "bg-[#4285f4]/15 border-[#4285f4]/30 text-[#8ab4f8]",
-      btnBg: "bg-[#4285f4] hover:bg-[#5a95f5]",
-      btnOutline: "bg-[#4285f4]/15 text-[#8ab4f8] hover:bg-[#4285f4]/25 border border-[#4285f4]/30",
-    },
-    {
-      key: "chatgpt",
-      name: "ChatGPT",
-      modelTag: "gpt-4o-mini",
-      brandColor: "#10a37f",
-      accentBg: "bg-[#10a37f]/15 border-[#10a37f]/30 text-[#6ee7b7]",
-      btnBg: "bg-[#10a37f] hover:bg-[#059669]",
-      btnOutline: "bg-[#10a37f]/15 text-[#6ee7b7] hover:bg-[#10a37f]/25 border border-[#10a37f]/30",
-    },
-    {
-      key: "claude",
-      name: "Claude",
-      modelTag: "claude-sonnet-4",
-      brandColor: "#d97706",
-      accentBg: "bg-[#d97706]/15 border-[#d97706]/30 text-[#fcd34d]",
-      btnBg: "bg-[#d97706] hover:bg-[#b45309]",
-      btnOutline: "bg-[#d97706]/15 text-[#fcd34d] hover:bg-[#d97706]/25 border border-[#d97706]/30",
-    },
-  ];
+  const verdictMeta = result ? getVerdictBadge(result.verdict, result.score) : null;
+  const issuesList = result ? (result.weaknesses || result.mistakes || []) : [];
 
   return (
     <div className="min-h-screen bg-[#131314] relative overflow-hidden text-slate-100 flex flex-col font-sans">
@@ -237,26 +179,26 @@ export default function Home() {
       <div className="gemini-ambient-glow animate-glow-drift pointer-events-none" />
 
       {/* Main container */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-8 sm:py-12 flex flex-col gap-8 relative z-10">
+      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-10 sm:py-16 flex flex-col gap-8 relative z-10">
         {/* Header section */}
-        <header className="text-center flex flex-col items-center gap-3">
+        <header className="text-center flex flex-col items-center gap-3.5">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-blue-500/10 border border-blue-400/20 text-blue-300 text-xs font-semibold tracking-wide uppercase">
             <SparklesIcon className="w-5 h-5 text-blue-400" />
-            <span>Simultaneous Multi-Model Arena &bull; Gemini &bull; ChatGPT &bull; Claude</span>
+            <span>Powered by Google Gemini 2.5 Flash</span>
           </div>
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent drop-shadow-sm">
-            Prompt Analyzer &amp; Arena
+            Prompt Analyzer &amp; Optimizer
           </h1>
-          <p className="text-sm sm:text-base text-[#9aa0a6] max-w-2xl leading-relaxed font-normal">
-            Submit your prompt once. Gemini, ChatGPT, and Claude optimize it in parallel, and our AI judge crowns the single Best Overall Prompt.
+          <p className="text-base sm:text-lg text-[#9aa0a6] max-w-2xl leading-relaxed font-normal">
+            Elevate your prompts into production-grade instructions. Get an instant score, pinpointed weaknesses, and a masterfully restructured rewrite.
           </p>
         </header>
 
-        {/* Horizontal Prompt Bar Card */}
-        <section className="bg-[#1e1f20] border border-[#303134] rounded-2xl p-5 sm:p-6 flex flex-col gap-4 shadow-xl">
+        {/* Input Card */}
+        <section className="bg-[#1e1f20] border border-[#303134] rounded-2xl p-5 sm:p-7 flex flex-col gap-4 shadow-xl">
           <div className="flex items-center justify-between">
             <label htmlFor="prompt-input" className="text-sm font-semibold text-[#e3e3e8] flex items-center gap-2">
-              <span>Raw Prompt Input</span>
+              <span>Your Raw Prompt</span>
               <span className="text-xs text-[#9aa0a6] font-normal">({prompt.length} characters)</span>
             </label>
             {prompt.length > 0 && (
@@ -273,19 +215,19 @@ export default function Home() {
 
           <textarea
             id="prompt-input"
-            rows={5}
+            rows={6}
             value={prompt}
             onChange={(e) => {
               setPrompt(e.target.value);
               if (error) setError(null);
             }}
-            placeholder={"Type or paste your prompt here...\n(e.g. 'Write a blog post about AI' or 'Edit this photo to look cinematic')"}
+            placeholder={"Paste or type any prompt here...\n(e.g. 'Write a blog post about artificial intelligence' or 'Edit this photo to look cinematic with warm golden lighting')"}
             className="w-full bg-[#131314] text-[#e3e3e8] placeholder-[#5f6368] text-sm sm:text-base p-4 rounded-xl border border-[#303134] focus:outline-none focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/15 transition-all resize-y leading-relaxed font-normal"
           />
 
           {/* Quick sample prompt pills */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-medium text-[#9aa0a6]">Sample prompts:</span>
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <span className="text-xs font-medium text-[#9aa0a6]">Try an example:</span>
             {SAMPLE_PROMPTS.map((sample, idx) => (
               <button
                 key={idx}
@@ -304,8 +246,8 @@ export default function Home() {
           {/* Action Row */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-3 border-t border-[#303134]">
             <div className="flex items-center gap-2 text-xs text-[#9aa0a6]">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span>Compares 3 models simultaneously in parallel</span>
+              <span className="inline-block w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+              <span>Gemini 2.5 Flash Prompt Engineering Engine</span>
             </div>
 
             <div className="flex items-center gap-3">
@@ -328,12 +270,12 @@ export default function Home() {
                 {isLoading ? (
                   <>
                     <SpinnerIcon className="w-5 h-5 animate-spin text-blue-100" />
-                    <span>Analyzing Across 3 Models...</span>
+                    <span>Analyzing &amp; Optimizing...</span>
                   </>
                 ) : (
                   <>
                     <SparklesIcon className="w-5 h-5 text-blue-100" />
-                    <span>Analyze &amp; Compare Models</span>
+                    <span>Analyze &amp; Optimize</span>
                   </>
                 )}
               </button>
@@ -351,213 +293,131 @@ export default function Home() {
 
         {/* Results Section */}
         {result && (
-          <section ref={resultsRef} className="flex flex-col gap-8 animate-in fade-in duration-300">
-            {/* 1. Highlighted '🏆 Best Overall Prompt' Hero Card */}
-            {result.best && (
-              <div className="relative rounded-2xl p-6 sm:p-7 bg-gradient-to-br from-[#1e1f20] via-[#232427] to-[#1e1f20] border-2 border-amber-500/50 shadow-[0_0_40px_rgba(245,158,11,0.15)] overflow-hidden">
-                {/* Subtle gold flare background */}
-                <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
-
-                <div className="relative z-10 flex flex-col gap-4">
-                  {/* Top Header of Hero Card */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#303134]">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-300 shadow-sm">
-                        <TrophyIcon className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h2 className="text-lg sm:text-xl font-extrabold text-white tracking-wide">
-                            🏆 Best Overall Prompt
-                          </h2>
-                          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/20 border border-amber-500/40 text-amber-300">
-                            Crowned Winner: {result.best.winnerName}
-                          </span>
-                        </div>
-                        <p className="text-xs text-[#9aa0a6] mt-0.5">
-                          Selected by Gemini Judge based on clarity, specificity, and structural effectiveness
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* One-Click Copy Best Prompt Button */}
-                    <button
-                      type="button"
-                      onClick={handleCopyBest}
-                      className={`self-start sm:self-auto px-4 py-2 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all cursor-pointer shadow-md ${
-                        copiedBest
-                          ? "bg-emerald-500 text-white shadow-emerald-500/20"
-                          : "bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black shadow-amber-500/20 hover:scale-[1.02] active:scale-[0.98]"
-                      }`}
-                    >
-                      {copiedBest ? (
-                        <>
-                          <CheckIcon className="w-5 h-5 text-white" />
-                          <span>Copied Best Prompt!</span>
-                        </>
-                      ) : (
-                        <>
-                          <CopyIcon className="w-5 h-5" />
-                          <span>Copy Best Prompt</span>
-                        </>
-                      )}
-                    </button>
+          <section ref={resultsRef} className="flex flex-col gap-6 animate-in fade-in duration-300">
+            {/* 1. Score & Verdict Card */}
+            <div className="bg-[#1e1f20] border border-[#303134] shadow-xl rounded-2xl p-6 sm:p-7 flex flex-col sm:flex-row items-center justify-between gap-6">
+              <div className="flex items-center gap-5 w-full sm:w-auto">
+                {/* Visual Score Display */}
+                <div className="relative flex items-center justify-center w-24 h-24 rounded-2xl bg-[#131314] border border-[#303134] shrink-0">
+                  <div className="flex flex-col items-center">
+                    <span className={`text-3xl font-black tracking-tight ${verdictMeta?.textClass}`}>
+                      {result.score}
+                    </span>
+                    <span className="text-[10px] font-semibold text-[#9aa0a6] uppercase tracking-widest">
+                      / 100
+                    </span>
                   </div>
+                </div>
 
-                  {/* Why It Won Callout */}
-                  {result.best.reason && (
-                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200/90 text-xs sm:text-sm leading-relaxed flex items-start gap-2.5">
-                      <CrownIcon className="w-5 h-5 shrink-0 text-amber-400 mt-0.5" />
-                      <div>
-                        <span className="font-semibold text-amber-300 mr-1.5">Why it won:</span>
-                        <span>{result.best.reason}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Winning Optimized Prompt Container */}
-                  <div className="relative rounded-xl bg-[#131314] border border-[#303134] p-4 sm:p-5 font-mono text-xs sm:text-sm text-[#e3e3e8] leading-relaxed whitespace-pre-wrap selection:bg-amber-500/30 selection:text-white shadow-inner max-h-[380px] overflow-y-auto">
-                    {result.best.optimizedPrompt}
+                <div className="flex flex-col gap-1.5 flex-1">
+                  <span className="text-xs uppercase tracking-wider text-[#9aa0a6] font-semibold">
+                    Overall Readiness
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${verdictMeta?.badgeClass}`}>
+                      {result.verdict}
+                    </span>
                   </div>
-
-                  <div className="flex items-center justify-between text-xs text-[#9aa0a6] pt-1">
-                    <span>Ready for direct production deployment</span>
-                    <span>{result.best.optimizedPrompt?.length || 0} characters</span>
-                  </div>
+                  <p className="text-xs text-[#bdc1c6] mt-0.5 leading-relaxed">
+                    {result.score >= 80
+                      ? "Excellent prompt with strong context, persona, and output instructions."
+                      : result.score >= 50
+                      ? "Good starting point, but lacks key constraints, persona, or explicit formatting."
+                      : "Lacks core prompt engineering pillars; optimization recommended before LLM inference."}
+                  </p>
                 </div>
               </div>
-            )}
 
-            {/* 2. Clean 3-Column Comparison Grid */}
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-white">
-                    Individual Model Comparison
-                  </h3>
-                  <span className="text-xs text-[#9aa0a6] hidden sm:inline">
-                    (Gemini &bull; ChatGPT &bull; Claude)
-                  </span>
+              {/* Score Progress Bar */}
+              <div className="w-full sm:w-56 flex flex-col gap-1.5">
+                <div className="flex justify-between text-xs text-[#bdc1c6] font-medium">
+                  <span>Prompt Quality</span>
+                  <span className={verdictMeta?.textClass}>{result.score}%</span>
                 </div>
-                <span className="text-xs text-[#9aa0a6]">
-                  Evaluated in parallel
+                <div className="w-full h-2.5 rounded-full bg-[#303134] overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ease-out ${verdictMeta?.barClass}`}
+                    style={{ width: `${Math.min(100, Math.max(0, result.score))}%` }}
+                  ></div>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Weaknesses / Mistakes Card */}
+            <div className="bg-[#1e1f20] border border-[#303134] shadow-xl rounded-2xl p-6 sm:p-7 flex flex-col gap-4">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]"></div>
+                <h3 className="text-base font-bold text-white">
+                  Detected Weaknesses &amp; Missing Elements
+                </h3>
+                <span className="ml-auto text-xs px-2.5 py-0.5 rounded-full bg-[#303134] text-[#bdc1c6] font-medium">
+                  {issuesList.length} issues found
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                {modelConfigs.map((cfg) => {
-                  const modelData = result.models?.[cfg.key];
-                  const isWinner = result.best?.winner === cfg.key;
-                  const isCopied = copiedModels[cfg.key];
-                  const scoreBadge = getScoreBadge(modelData?.score || 0);
-
-                  return (
-                    <div
-                      key={cfg.key}
-                      className={`rounded-2xl p-5 bg-[#1e1f20] border flex flex-col justify-between gap-4 transition-all duration-200 ${
-                        isWinner
-                          ? "border-amber-500/50 shadow-[0_0_20px_rgba(245,158,11,0.1)]"
-                          : "border-[#303134] hover:border-[#424449]"
-                      }`}
+              {issuesList.length > 0 ? (
+                <ul className="grid grid-cols-1 gap-2.5">
+                  {issuesList.map((weakness, idx) => (
+                    <li
+                      key={idx}
+                      className="p-3.5 rounded-xl bg-[#131314] border border-[#303134] text-sm text-[#e3e3e8] flex items-start gap-3 leading-relaxed"
                     >
-                      {/* Column Header */}
-                      <div className="flex flex-col gap-2.5 pb-3 border-b border-[#303134]">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="w-3 h-3 rounded-full"
-                              style={{ backgroundColor: cfg.brandColor }}
-                            />
-                            <h4 className="text-base font-bold text-white">
-                              {cfg.name}
-                            </h4>
-                            <span className="text-[11px] font-mono text-[#9aa0a6] px-1.5 py-0.5 rounded bg-[#131314] border border-[#303134]">
-                              {cfg.modelTag}
-                            </span>
-                          </div>
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-2 shrink-0"></span>
+                      <span>{weakness}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-emerald-400 p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                  No critical mistakes or missing elements detected.
+                </p>
+              )}
+            </div>
 
-                          {isWinner && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                              <CrownIcon className="w-5 h-5 text-amber-400" />
-                              Winner
-                            </span>
-                          )}
-                        </div>
+            {/* 3. Optimized Prompt Box */}
+            <div className="bg-[#1e1f20] border border-[#303134] shadow-xl rounded-2xl overflow-hidden flex flex-col">
+              <div className="p-4 sm:p-5 bg-[#282a2c] border-b border-[#303134] flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-[#4285f4] shadow-[0_0_8px_rgba(66,133,244,0.6)]"></div>
+                  <h3 className="text-base font-bold text-white">
+                    Optimized Production-Ready Prompt
+                  </h3>
+                  <span className="hidden sm:inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#4285f4]/15 text-[#8ab4f8] border border-[#4285f4]/30">
+                    Gemini 2.5 Flash
+                  </span>
+                </div>
 
-                        {/* Score and status badge */}
-                        <div className="flex items-center justify-between pt-1">
-                          <span className="text-xs text-[#9aa0a6]">Quality Score:</span>
-                          {modelData?.status === "error" ? (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                              API Unavailable
-                            </span>
-                          ) : (
-                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${scoreBadge.bg}`}>
-                              {scoreBadge.label} ({scoreBadge.tag})
-                            </span>
-                          )}
-                        </div>
-                      </div>
+                {/* Working Copy Button */}
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    copied
+                      ? "bg-emerald-500 text-white shadow-emerald-500/20"
+                      : "bg-[#4285f4] hover:bg-[#5a95f5] text-white shadow-[0_0_15px_rgba(66,133,244,0.3)]"
+                  }`}
+                >
+                  {copied ? (
+                    <>
+                      <CheckIcon className="w-5 h-5 text-white" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <CopyIcon className="w-5 h-5" />
+                      <span>Copy Prompt</span>
+                    </>
+                  )}
+                </button>
+              </div>
 
-                      {/* Weaknesses Identified */}
-                      {modelData?.weaknesses && modelData.weaknesses.length > 0 && (
-                        <div className="flex flex-col gap-1.5">
-                          <span className="text-[11px] uppercase tracking-wider text-[#9aa0a6] font-semibold">
-                            Weaknesses Detected:
-                          </span>
-                          <ul className="space-y-1 text-xs text-[#bdc1c6]">
-                            {modelData.weaknesses.slice(0, 3).map((w, idx) => (
-                              <li key={idx} className="flex items-start gap-1.5 leading-snug">
-                                <span className="text-amber-400 shrink-0 mt-0.5">•</span>
-                                <span className="line-clamp-2">{w}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
+              <div className="p-5 sm:p-6 bg-[#131314] text-[#e3e3e8] text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-sans selection:bg-blue-500/40 selection:text-white max-h-[460px] overflow-y-auto">
+                {result.optimizedPrompt}
+              </div>
 
-                      {/* Model Optimized Prompt Preview */}
-                      <div className="flex flex-col gap-1.5 flex-1">
-                        <span className="text-[11px] uppercase tracking-wider text-[#9aa0a6] font-semibold">
-                          Optimized Prompt:
-                        </span>
-                        <div className="flex-1 min-h-[180px] max-h-[260px] overflow-y-auto p-3.5 rounded-xl bg-[#131314] border border-[#303134] text-xs font-mono text-[#e3e3e8] leading-relaxed whitespace-pre-wrap shadow-inner selection:bg-blue-500/30 selection:text-white">
-                          {modelData?.optimizedPrompt || "No prompt generated"}
-                        </div>
-                      </div>
-
-                      {/* Individual Copy Button */}
-                      <div className="pt-2 border-t border-[#303134] flex items-center justify-between gap-2">
-                        <span className="text-[11px] text-[#9aa0a6]">
-                          {modelData?.optimizedPrompt?.length || 0} chars
-                        </span>
-
-                        <button
-                          type="button"
-                          disabled={!modelData?.optimizedPrompt || modelData?.status === "error"}
-                          onClick={() => handleCopyModel(cfg.key, modelData?.optimizedPrompt)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
-                            isCopied
-                              ? "bg-emerald-500 text-white"
-                              : cfg.btnOutline
-                          }`}
-                        >
-                          {isCopied ? (
-                            <>
-                              <CheckIcon className="w-5 h-5 text-white" />
-                              <span>Copied!</span>
-                            </>
-                          ) : (
-                            <>
-                              <CopyIcon className="w-5 h-5" />
-                              <span>Copy {cfg.name}</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="p-3 bg-[#282a2c] border-t border-[#303134] px-5 flex items-center justify-between text-xs text-[#9aa0a6]">
+                <span>Structured with role, context, task, constraints, and output format</span>
+                <span>{result.optimizedPrompt?.length || 0} characters</span>
               </div>
             </div>
           </section>
@@ -566,7 +426,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="w-full border-t border-[#303134] py-6 text-center text-xs text-[#9aa0a6] relative z-10">
-        Prompt Analyzer &amp; Arena &bull; Parallel Multi-Model Comparison powered by Gemini, ChatGPT &amp; Claude
+        Prompt Analyzer &amp; Optimizer &bull; Powered by Next.js, Tailwind CSS &amp; Google Gemini 2.5 Flash
       </footer>
     </div>
   );
