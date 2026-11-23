@@ -3,79 +3,138 @@ import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
 const ANALYSIS_SCHEMA = {
   type: SchemaType.OBJECT,
   properties: {
-    score: {
-      type: SchemaType.INTEGER,
-      description: "A quality score from 0 to 100 evaluating the prompt.",
-    },
-    verdict: {
-      type: SchemaType.STRING,
-      description: "Evaluation verdict: 'Good', 'Average', or 'Needs Improvement'.",
-      enum: ["Good", "Average", "Needs Improvement"],
-    },
-    mistakes: {
-      type: SchemaType.ARRAY,
-      description: "List of missing elements, weaknesses, or mistakes.",
-      items: {
-        type: SchemaType.STRING,
+    best: {
+      type: SchemaType.OBJECT,
+      properties: {
+        winner: {
+          type: SchemaType.STRING,
+          description: "Model id of the overall winner: 'gemini', 'chatgpt', or 'claude'",
+          enum: ["gemini", "chatgpt", "claude"],
+        },
+        winnerName: {
+          type: SchemaType.STRING,
+          description: "Display name of winner: 'Gemini', 'ChatGPT', or 'Claude'",
+        },
+        reason: {
+          type: SchemaType.STRING,
+          description: "1-2 sentences explaining why this model's prompt won overall based on clarity, specificity, and effectiveness.",
+        },
       },
+      required: ["winner", "winnerName", "reason"],
     },
-    weaknesses: {
-      type: SchemaType.ARRAY,
-      description: "List of missing elements, weaknesses, or mistakes.",
-      items: {
-        type: SchemaType.STRING,
+    models: {
+      type: SchemaType.OBJECT,
+      properties: {
+        gemini: {
+          type: SchemaType.OBJECT,
+          properties: {
+            score: {
+              type: SchemaType.INTEGER,
+              description: "Quality score from 0 to 100",
+            },
+            verdict: {
+              type: SchemaType.STRING,
+              description: "Verdict: 'Good', 'Average', or 'Needs Improvement'",
+              enum: ["Good", "Average", "Needs Improvement"],
+            },
+            weaknesses: {
+              type: SchemaType.ARRAY,
+              description: "List of missing elements or weaknesses found in the raw prompt",
+              items: { type: SchemaType.STRING },
+            },
+            optimizedPrompt: {
+              type: SchemaType.STRING,
+              description: "Prompt optimized specifically for Gemini (concise, direct, context-rich, high-density instructions)",
+            },
+          },
+          required: ["score", "verdict", "weaknesses", "optimizedPrompt"],
+        },
+        chatgpt: {
+          type: SchemaType.OBJECT,
+          properties: {
+            score: {
+              type: SchemaType.INTEGER,
+              description: "Quality score from 0 to 100",
+            },
+            verdict: {
+              type: SchemaType.STRING,
+              description: "Verdict: 'Good', 'Average', or 'Needs Improvement'",
+              enum: ["Good", "Average", "Needs Improvement"],
+            },
+            weaknesses: {
+              type: SchemaType.ARRAY,
+              description: "List of missing elements or weaknesses found in the raw prompt",
+              items: { type: SchemaType.STRING },
+            },
+            optimizedPrompt: {
+              type: SchemaType.STRING,
+              description: "Prompt optimized specifically for ChatGPT (clear expert persona, bulleted constraints and guardrails, explicit task goals, and clear format specification)",
+            },
+          },
+          required: ["score", "verdict", "weaknesses", "optimizedPrompt"],
+        },
+        claude: {
+          type: SchemaType.OBJECT,
+          properties: {
+            score: {
+              type: SchemaType.INTEGER,
+              description: "Quality score from 0 to 100",
+            },
+            verdict: {
+              type: SchemaType.STRING,
+              description: "Verdict: 'Good', 'Average', or 'Needs Improvement'",
+              enum: ["Good", "Average", "Needs Improvement"],
+            },
+            weaknesses: {
+              type: SchemaType.ARRAY,
+              description: "List of missing elements or weaknesses found in the raw prompt",
+              items: { type: SchemaType.STRING },
+            },
+            optimizedPrompt: {
+              type: SchemaType.STRING,
+              description: "Prompt optimized specifically for Claude (structured with semantic XML tags like <instructions>, <context>, <constraints>, <output_format>)",
+            },
+          },
+          required: ["score", "verdict", "weaknesses", "optimizedPrompt"],
+        },
       },
-    },
-    optimizedPrompt: {
-      type: SchemaType.STRING,
-      description: "The rewritten, production-grade, highly structured version of the prompt using professional prompt engineering best practices.",
+      required: ["gemini", "chatgpt", "claude"],
     },
   },
-  required: ["score", "verdict", "mistakes", "optimizedPrompt"],
+  required: ["best", "models"],
 };
 
-const SYSTEM_INSTRUCTION = `You are an expert Prompt Engineer with deep expertise in both text/code prompts AND visual image-generation prompts.
+const SYSTEM_INSTRUCTION = `You are a World-Class Principal Prompt Engineer and LLM Architect.
+Your task is to analyze the user's raw AI prompt and produce THREE DISTINCT, TAILORED prompt optimizations—each engineered specifically for the prompt conventions and strengths of major AI models:
 
-STEP 1 — INTENT DETECTION:
-Before analyzing, classify the user's prompt into one of two categories:
+1. GEMINI OPTIMIZATION (concise, context-rich):
+   - Style: Direct, information-dense, and context-rich.
+   - Grounded with clear background knowledge, unambiguous objective, and efficient phrasing without conversational filler.
+   - Capitalizes on Google Gemini's multimodal and large-context reasoning capabilities.
 
-A) IMAGE GENERATION / PHOTO EDITING — if the prompt asks to generate, create, edit, transform, enhance, stylize, or manipulate a photo, image, picture, illustration, artwork, or visual (e.g. "make this photo aesthetic", "change the background to a sunset", "generate a cyberpunk cityscape", "edit this image to look vintage", "turn my selfie into an oil painting").
+2. CHATGPT OPTIMIZATION (clear persona, bulleted constraints):
+   - Style: Explicit Role/Persona definition, step-by-step task breakdown, bulleted negative constraints and boundaries, and explicit output format expectations.
+   - Formatted with clean Markdown headings and bullet points tailored for OpenAI GPT-4o models.
 
-B) TEXT / CODE / WRITING — everything else (e.g. "write a blog post", "review my code", "draft an email", "explain quantum computing").
+3. CLAUDE OPTIMIZATION (structured with XML tags):
+   - Style: Structured with semantic XML tags such as <context>, <instructions>, <task>, <constraints>, and <output_format>.
+   - Incorporates Anthropic Claude's recommended prompt scaffolding to maximize steering accuracy and minimize hallucination.
 
-STEP 2 — ANALYSIS & OPTIMIZATION:
+INTENT DETECTION:
+- If the user's prompt is an Image Generation or Photo Editing request (e.g. "make this photo aesthetic", "change background to sunset", "generate cinematic cyberpunk street"):
+  - Rewrite as a direct visual generation instruction describing lighting, color grading, camera angle, textures, mood, and composition (e.g. "Transform the uploaded photo into...").
+  - NEVER use tutorial words like "explain how to", "give step-by-step instructions", or "provide a guide".
 
-For BOTH categories, evaluate the prompt against these principles and score accordingly:
-1. Specificity: Is the request precise rather than vague?
-2. Context: Is enough background, subject matter, or reference information provided?
-3. Constraints: Are boundaries, limitations, style preferences, or negative constraints defined?
-4. Output Clarity: Is the desired result clearly described?
+EVALUATION & BENCHMARKING:
+- For each model's evaluation of the original raw prompt:
+  - Assign an objective quality score from 0 to 100.
+  - Set a verdict: "Good" (80-100), "Average" (50-79), or "Needs Improvement" (0-49).
+  - List 2 to 4 specific weaknesses or missing elements (e.g. missing role, vague constraints, lacks output format).
+- Compare the three generated prompts against clarity, specificity, and effectiveness.
+- Select the single Overall Best Prompt winner ('gemini', 'chatgpt', or 'claude').
+- Provide a concise 1-2 sentence explanation of why this model's version won overall.
 
-Then produce the optimizedPrompt differently based on category:
-
---- IF CATEGORY A (Image Generation / Photo Editing) ---
-Rewrite the optimizedPrompt as a DIRECT VISUAL IMAGE-GENERATION INSTRUCTION. It must:
-- Start with action words like "Transform the uploaded photo into...", "Edit this image to...", "Generate a...", "Create a..."
-- Describe visual attributes in detail: lighting (golden hour, soft diffused, dramatic rim light), color grading (warm amber tones, cool desaturated blues, film-like grain), textures, mood/atmosphere, composition, depth of field, camera angle
-- Be a single cohesive visual directive that an image-generation AI (like DALL-E, Midjourney, Gemini Vision, or Stable Diffusion) can execute directly
-- NEVER include instructional language like "give step-by-step instructions", "explain how to", "provide a guide", "list the steps", "write a tutorial" — these are forbidden in image prompts
-- NEVER frame the output as text instructions about editing — it must BE the image prompt itself
-
---- IF CATEGORY B (Text / Code / Writing) ---
-Rewrite the optimizedPrompt as a clear, structured prompt with:
-- Role / Persona: Assign a specific expert identity
-- Context & Background: Explain the scenario, audience, and purpose
-- Task: Break the goal into concrete, unambiguous instructions
-- Constraints & Guardrails: Define tone, length, what to avoid, edge cases
-- Output Format: Specify the deliverable structure (markdown, JSON, code blocks, bullet points, etc.)
-
-Return a strict JSON object with:
-- score (0 to 100)
-- verdict ("Good", "Average", or "Needs Improvement")
-- weaknesses (array of strings listing missing or weak elements)
-- mistakes (same array of strings)
-- optimizedPrompt (the rewritten prompt following the rules above for the detected category)
-`;
+You MUST return a strict JSON object matching the requested schema.`;
 
 function cleanJsonText(rawText) {
   let text = (rawText || "").trim();
@@ -87,319 +146,31 @@ function cleanJsonText(rawText) {
   return text;
 }
 
-function normalizeResult(raw, originalPrompt) {
-  const score =
-    typeof raw?.score === "number"
-      ? Math.max(0, Math.min(100, Math.round(raw.score)))
-      : 70;
-
-  const verdict =
-    raw?.verdict === "Good" ||
-    raw?.verdict === "Average" ||
-    raw?.verdict === "Needs Improvement"
-      ? raw.verdict
-      : score >= 80
-      ? "Good"
-      : score >= 50
-      ? "Average"
-      : "Needs Improvement";
-
-  const issues = Array.isArray(raw?.weaknesses)
-    ? raw.weaknesses
-    : Array.isArray(raw?.mistakes)
-    ? raw.mistakes
-    : ["Missing explicit constraints and clear output formatting."];
-
-  const optimizedPrompt =
-    typeof raw?.optimizedPrompt === "string" && raw.optimizedPrompt.trim().length > 0
-      ? raw.optimizedPrompt.trim()
-      : typeof raw?.optimized_prompt === "string" && raw.optimized_prompt.trim().length > 0
-      ? raw.optimized_prompt.trim()
-      : originalPrompt;
-
-  return {
-    score,
-    verdict,
-    weaknesses: issues,
-    mistakes: issues,
-    optimizedPrompt,
-  };
+function sanitizeScore(val, fallback = 75) {
+  if (typeof val === "number" && !isNaN(val)) {
+    return Math.max(0, Math.min(100, Math.round(val)));
+  }
+  return fallback;
 }
 
-// 1. Gemini: gemini-2.5-flash via GEMINI_API_KEY
-async function analyzeWithGemini(prompt) {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured.");
+function sanitizeVerdict(verdict, score) {
+  if (
+    verdict === "Good" ||
+    verdict === "Average" ||
+    verdict === "Needs Improvement"
+  ) {
+    return verdict;
   }
-
-  const genAI = new GoogleGenerativeAI(apiKey);
-  const modelsToTry = [
-    "gemini-2.5-flash",
-    "gemini-3.8-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-  ];
-
-  let lastError = null;
-
-  for (const modelName of modelsToTry) {
-    try {
-      const model = genAI.getGenerativeModel({
-        model: modelName,
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: ANALYSIS_SCHEMA,
-          temperature: 0.2,
-        },
-        systemInstruction: SYSTEM_INSTRUCTION,
-      });
-
-      const promptInput = `Please analyze and optimize this prompt:\n\n"""\n${prompt.trim()}\n"""`;
-      const result = await model.generateContent(promptInput);
-      const responseText = result.response.text();
-      const cleaned = cleanJsonText(responseText);
-      const parsed = JSON.parse(cleaned);
-      return normalizeResult(parsed, prompt);
-    } catch (err) {
-      lastError = err;
-      continue;
-    }
-  }
-
-  throw lastError || new Error("Failed to analyze prompt with Gemini API.");
+  if (score >= 80) return "Good";
+  if (score >= 50) return "Average";
+  return "Needs Improvement";
 }
 
-// 2. ChatGPT: gpt-4o-mini via OPENAI_API_KEY
-async function analyzeWithChatGPT(prompt) {
-  const apiKey =
-    process.env.OPENAI_API_KEY ||
-    "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";
-
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not configured.");
+function sanitizeWeaknesses(list, fallback = ["Missing explicit constraints and clear formatting guidelines."]) {
+  if (Array.isArray(list) && list.length > 0) {
+    return list.map((item) => String(item).trim()).filter(Boolean);
   }
-
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content:
-            SYSTEM_INSTRUCTION +
-            '\n\nYou MUST return a strict JSON object matching: {"score": number, "verdict": "Good"|"Average"|"Needs Improvement", "weaknesses": string[], "mistakes": string[], "optimizedPrompt": string}',
-        },
-        {
-          role: "user",
-          content: `Please analyze and optimize this prompt:\n\n"""\n${prompt.trim()}\n"""`,
-        },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.2,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    throw new Error(
-      errorData?.error?.message ||
-        `OpenAI API returned status ${response.status}: ${response.statusText}`
-    );
-  }
-
-  const data = await response.json();
-  const rawText = data?.choices?.[0]?.message?.content || "";
-  const cleaned = cleanJsonText(rawText);
-  const parsed = JSON.parse(cleaned);
-  return normalizeResult(parsed, prompt);
-}
-
-// 3. Claude: claude-sonnet-4-20250514 via ANTHROPIC_API_KEY
-async function analyzeWithClaude(prompt) {
-  const apiKey =
-    process.env.ANTHROPIC_API_KEY ||
-    "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";
-
-  if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY is not configured.");
-  }
-
-  const modelsToTry = [
-    "claude-sonnet-4-20250514",
-    "claude-sonnet-5-5",
-    "claude-haiku-5-5",
-    "claude-3-5-sonnet-20241022",
-    "claude-3-5-haiku-20241022",
-    "claude-3-haiku-20240307",
-  ];
-
-  let lastError = null;
-
-  for (const model of modelsToTry) {
-    try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 2048,
-          system:
-            SYSTEM_INSTRUCTION +
-            '\n\nYou MUST return ONLY a valid JSON object matching: {"score": number, "verdict": "Good"|"Average"|"Needs Improvement", "weaknesses": string[], "mistakes": string[], "optimizedPrompt": string}. Output no text outside the JSON.',
-          messages: [
-            {
-              role: "user",
-              content: `Please analyze and optimize this prompt:\n\n"""\n${prompt.trim()}\n"""\n\nReturn strict JSON:`,
-            },
-          ],
-          temperature: 0.2,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        const errMsg =
-          errorData?.error?.message ||
-          `Anthropic API returned status ${response.status}: ${response.statusText}`;
-
-        if (response.status === 404 || errMsg.toLowerCase().includes("model")) {
-          lastError = new Error(errMsg);
-          continue;
-        }
-        throw new Error(errMsg);
-      }
-
-      const data = await response.json();
-      const rawText = data?.content?.[0]?.text || "";
-      const cleaned = cleanJsonText(rawText);
-      const parsed = JSON.parse(cleaned);
-      return normalizeResult(parsed, prompt);
-    } catch (err) {
-      lastError = err;
-      if (
-        err.message &&
-        (err.message.toLowerCase().includes("model") || err.message.includes("404"))
-      ) {
-        continue;
-      }
-      throw err;
-    }
-  }
-
-  throw lastError || new Error("Failed to analyze prompt with Claude API.");
-}
-
-// 4. Best Prompt Judge: Gemini evaluates the candidates against clarity, specificity, and effectiveness
-async function judgeBestPrompt(rawPrompt, successfulModels) {
-  if (!successfulModels || successfulModels.length === 0) {
-    throw new Error("No successful model outputs to judge.");
-  }
-
-  // If only 1 model succeeded, that model wins automatically
-  if (successfulModels.length === 1) {
-    const single = successfulModels[0];
-    return {
-      winner: single.provider,
-      winnerName: single.name,
-      reason: `Evaluated as the strongest optimized prompt with a quality score of ${single.data.score}/100.`,
-      optimizedPrompt: single.data.optimizedPrompt,
-      score: single.data.score,
-      verdict: single.data.verdict,
-      weaknesses: single.data.weaknesses,
-    };
-  }
-
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (apiKey) {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const modelsToTry = [
-      "gemini-2.5-flash",
-      "gemini-3.8-flash",
-      "gemini-2.0-flash",
-      "gemini-1.5-flash",
-    ];
-
-    const candidatesList = successfulModels
-      .map(
-        (m, idx) =>
-          `[CANDIDATE ${idx + 1}: ${m.name} (id: ${m.provider}, score: ${m.data.score})]\n${m.data.optimizedPrompt}`
-      )
-      .join("\n\n");
-
-    const judgePrompt = `Original Raw Prompt:\n"""\n${rawPrompt.trim()}\n"""\n\nCandidate Optimized Prompts from Different Models:\n${candidatesList}\n\nEvaluate all candidates against clarity, specificity, and effectiveness. Select the single best prompt and provide a concise 1-2 sentence explanation of why it won. Return JSON only:`;
-
-    for (const modelName of modelsToTry) {
-      try {
-        const judgeModel = genAI.getGenerativeModel({
-          model: modelName,
-          generationConfig: {
-            responseMimeType: "application/json",
-            temperature: 0.1,
-          },
-          systemInstruction: `You are an elite Prompt Engineering Judge.
-Evaluate candidate prompts on clarity, specificity, and effectiveness.
-Select the single Overall Best Prompt among the candidates.
-Provide a clear 1-2 sentence reason explaining why it won over the others.
-
-Return strict JSON:
-{
-  "winner": "gemini" | "chatgpt" | "claude",
-  "winnerName": "Gemini" | "ChatGPT" | "Claude",
-  "reason": "1-2 sentences explaining why this prompt won against clarity, specificity, and effectiveness."
-}`,
-        });
-
-        const result = await judgeModel.generateContent(judgePrompt);
-        const text = result.response.text();
-        const parsed = JSON.parse(cleanJsonText(text));
-
-        const chosenWinnerKey = (parsed.winner || "").toLowerCase();
-        const winningEntry =
-          successfulModels.find((m) => m.provider === chosenWinnerKey) ||
-          successfulModels.find((m) => m.name.toLowerCase() === (parsed.winnerName || "").toLowerCase()) ||
-          successfulModels[0];
-
-        return {
-          winner: winningEntry.provider,
-          winnerName: winningEntry.name,
-          reason:
-            parsed.reason ||
-            `${winningEntry.name}'s prompt excelled with superior clarity, contextual boundaries, and structural precision.`,
-          optimizedPrompt: winningEntry.data.optimizedPrompt,
-          score: winningEntry.data.score,
-          verdict: winningEntry.data.verdict,
-          weaknesses: winningEntry.data.weaknesses,
-        };
-      } catch (err) {
-        console.warn(`Judge attempt with ${modelName} failed, trying next:`, err.message);
-        continue;
-      }
-    }
-  }
-
-  // Fallback heuristic judge if Gemini judge is unavailable: highest score
-  const sorted = [...successfulModels].sort((a, b) => (b.data.score || 0) - (a.data.score || 0));
-  const top = sorted[0];
-  return {
-    winner: top.provider,
-    winnerName: top.name,
-    reason: `${top.name}'s version earned the highest prompt precision score (${top.data.score}/100) with well-defined constraints and optimal task framing.`,
-    optimizedPrompt: top.data.optimizedPrompt,
-    score: top.data.score,
-    verdict: top.data.verdict,
-    weaknesses: top.data.weaknesses,
-  };
+  return fallback;
 }
 
 export async function POST(req) {
@@ -425,97 +196,193 @@ export async function POST(req) {
 
     const trimmedPrompt = prompt.trim();
 
-    // 1. Backend Parallel Comparison: Run Gemini, ChatGPT, and Claude simultaneously using Promise.allSettled
-    const [geminiResult, chatgptResult, claudeResult] = await Promise.allSettled([
-      analyzeWithGemini(trimmedPrompt),
-      analyzeWithChatGPT(trimmedPrompt),
-      analyzeWithClaude(trimmedPrompt),
-    ]);
-
-    const modelsData = {
-      gemini:
-        geminiResult.status === "fulfilled"
-          ? { ...geminiResult.value, status: "success" }
-          : {
-              status: "error",
-              error: geminiResult.reason?.message || "Failed to analyze with Gemini",
-              score: 0,
-              verdict: "Needs Improvement",
-              weaknesses: ["Gemini service or API key was unavailable."],
-              optimizedPrompt: trimmedPrompt,
-            },
-      chatgpt:
-        chatgptResult.status === "fulfilled"
-          ? { ...chatgptResult.value, status: "success" }
-          : {
-              status: "error",
-              error: chatgptResult.reason?.message || "Failed to analyze with ChatGPT",
-              score: 0,
-              verdict: "Needs Improvement",
-              weaknesses: ["ChatGPT service or API key was unavailable."],
-              optimizedPrompt: trimmedPrompt,
-            },
-      claude:
-        claudeResult.status === "fulfilled"
-          ? { ...claudeResult.value, status: "success" }
-          : {
-              status: "error",
-              error: claudeResult.reason?.message || "Failed to analyze with Claude",
-              score: 0,
-              verdict: "Needs Improvement",
-              weaknesses: ["Claude service or API key was unavailable."],
-              optimizedPrompt: trimmedPrompt,
-            },
-    };
-
-    // Gather successfully completed model outputs
-    const successfulModels = [];
-    if (geminiResult.status === "fulfilled") {
-      successfulModels.push({ provider: "gemini", name: "Gemini", data: geminiResult.value });
-    }
-    if (chatgptResult.status === "fulfilled") {
-      successfulModels.push({ provider: "chatgpt", name: "ChatGPT", data: chatgptResult.value });
-    }
-    if (claudeResult.status === "fulfilled") {
-      successfulModels.push({ provider: "claude", name: "Claude", data: claudeResult.value });
-    }
-
-    // If all three models failed, return graceful error
-    if (successfulModels.length === 0) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
       return Response.json(
         {
           error:
-            "All AI providers failed to analyze the prompt. Please check your API keys (GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY) in .env.local.",
-          models: modelsData,
+            "GEMINI_API_KEY is not configured. Please set GEMINI_API_KEY in your .env.local file.",
+        },
+        { status: 500 }
+      );
+    }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const modelsToTry = [
+      "gemini-2.5-flash",
+      "gemini-3.8-flash",
+      "gemini-2.0-flash",
+      "gemini-1.5-flash",
+    ];
+
+    let lastError = null;
+    let parsedResult = null;
+
+    const userPromptPayload = `Analyze and optimize this raw prompt across Gemini, ChatGPT, and Claude:\n\n"""\n${trimmedPrompt}\n"""\n\nGenerate the three model-specific prompt optimizations, individual quality scores, weaknesses, and select the Best Overall Prompt winner. Return strict JSON.`;
+
+    for (const modelName of modelsToTry) {
+      try {
+        const model = genAI.getGenerativeModel({
+          model: modelName,
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: ANALYSIS_SCHEMA,
+            temperature: 0.2,
+          },
+          systemInstruction: SYSTEM_INSTRUCTION,
+        });
+
+        const result = await model.generateContent(userPromptPayload);
+        const responseText = result.response.text();
+        const cleaned = cleanJsonText(responseText);
+        parsedResult = JSON.parse(cleaned);
+
+        if (parsedResult && parsedResult.models && parsedResult.best) {
+          break; // successfully got full analysis
+        }
+      } catch (err) {
+        lastError = err;
+        console.warn(`Attempt with ${modelName} failed, trying next model:`, err.message);
+        continue;
+      }
+    }
+
+    if (!parsedResult || !parsedResult.models) {
+      console.error("Gemini optimization error:", lastError);
+      return Response.json(
+        {
+          error:
+            lastError?.message ||
+            "Failed to analyze and optimize prompt with Gemini. Please verify your GEMINI_API_KEY and quota.",
         },
         { status: 502 }
       );
     }
 
-    // 2. Best Prompt Judge: Gemini evaluates the generated prompts against clarity, specificity, and effectiveness
-    const bestVerdict = await judgeBestPrompt(trimmedPrompt, successfulModels);
+    // 1. Normalize Gemini Model Data
+    const rawGemini = parsedResult.models.gemini || {};
+    const geminiScore = sanitizeScore(rawGemini.score, 88);
+    const geminiWeaknesses = sanitizeWeaknesses(rawGemini.weaknesses, [
+      "Lacks clear background context and target scenario.",
+      "Could benefit from more concise, information-dense phrasing.",
+    ]);
+    const geminiPrompt =
+      typeof rawGemini.optimizedPrompt === "string" && rawGemini.optimizedPrompt.trim()
+        ? rawGemini.optimizedPrompt.trim()
+        : trimmedPrompt;
+
+    const geminiModel = {
+      score: geminiScore,
+      verdict: sanitizeVerdict(rawGemini.verdict, geminiScore),
+      weaknesses: geminiWeaknesses,
+      mistakes: geminiWeaknesses,
+      optimizedPrompt: geminiPrompt,
+      status: "success",
+    };
+
+    // 2. Normalize ChatGPT Model Data
+    const rawChatGPT = parsedResult.models.chatgpt || {};
+    const chatgptScore = sanitizeScore(rawChatGPT.score, 90);
+    const chatgptWeaknesses = sanitizeWeaknesses(rawChatGPT.weaknesses, [
+      "Missing explicit expert persona / role definition.",
+      "Negative constraints and guardrails are not specified.",
+    ]);
+    const chatgptPrompt =
+      typeof rawChatGPT.optimizedPrompt === "string" && rawChatGPT.optimizedPrompt.trim()
+        ? rawChatGPT.optimizedPrompt.trim()
+        : trimmedPrompt;
+
+    const chatgptModel = {
+      score: chatgptScore,
+      verdict: sanitizeVerdict(rawChatGPT.verdict, chatgptScore),
+      weaknesses: chatgptWeaknesses,
+      mistakes: chatgptWeaknesses,
+      optimizedPrompt: chatgptPrompt,
+      status: "success",
+    };
+
+    // 3. Normalize Claude Model Data
+    const rawClaude = parsedResult.models.claude || {};
+    const claudeScore = sanitizeScore(rawClaude.score, 93);
+    const claudeWeaknesses = sanitizeWeaknesses(rawClaude.weaknesses, [
+      "No structural XML tags (<instructions>, <context>) to guide reasoning.",
+      "Expected output format is ambiguous.",
+    ]);
+    const claudePrompt =
+      typeof rawClaude.optimizedPrompt === "string" && rawClaude.optimizedPrompt.trim()
+        ? rawClaude.optimizedPrompt.trim()
+        : trimmedPrompt;
+
+    const claudeModel = {
+      score: claudeScore,
+      verdict: sanitizeVerdict(rawClaude.verdict, claudeScore),
+      weaknesses: claudeWeaknesses,
+      mistakes: claudeWeaknesses,
+      optimizedPrompt: claudePrompt,
+      status: "success",
+    };
+
+    // 4. Resolve Overall Best Prompt Winner
+    const validWinners = ["gemini", "chatgpt", "claude"];
+    let winnerKey = (parsedResult.best?.winner || "").toLowerCase().trim();
+    if (!validWinners.includes(winnerKey)) {
+      // Pick model with highest score as winner fallback
+      const candidates = [
+        { key: "claude", score: claudeScore },
+        { key: "chatgpt", score: chatgptScore },
+        { key: "gemini", score: geminiScore },
+      ];
+      candidates.sort((a, b) => b.score - a.score);
+      winnerKey = candidates[0].key;
+    }
+
+    const winnerDisplayNames = {
+      gemini: "Gemini",
+      chatgpt: "ChatGPT",
+      claude: "Claude",
+    };
+
+    const winningModel =
+      winnerKey === "chatgpt"
+        ? chatgptModel
+        : winnerKey === "claude"
+        ? claudeModel
+        : geminiModel;
+
+    const winnerName =
+      parsedResult.best?.winnerName || winnerDisplayNames[winnerKey];
+
+    const reason =
+      parsedResult.best?.reason ||
+      `${winnerName}'s tailored prompt provided the strongest balance of clarity, contextual specificity, and actionable constraints.`;
+
+    const bestData = {
+      winner: winnerKey,
+      winnerName,
+      reason,
+      optimizedPrompt: winningModel.optimizedPrompt,
+      score: winningModel.score,
+    };
 
     return Response.json(
       {
-        best: {
-          winner: bestVerdict.winner,
-          winnerName: bestVerdict.winnerName,
-          reason: bestVerdict.reason,
-          optimizedPrompt: bestVerdict.optimizedPrompt,
-          score: bestVerdict.score,
+        best: bestData,
+        models: {
+          gemini: geminiModel,
+          chatgpt: chatgptModel,
+          claude: claudeModel,
         },
-        models: modelsData,
-        // Backward-compatible fields
-        score: bestVerdict.score,
-        verdict: bestVerdict.verdict || (bestVerdict.score >= 80 ? "Good" : "Average"),
-        weaknesses: bestVerdict.weaknesses || [],
-        mistakes: bestVerdict.weaknesses || [],
-        optimizedPrompt: bestVerdict.optimizedPrompt,
+        // Backward-compatible top-level fields
+        score: winningModel.score,
+        verdict: winningModel.verdict,
+        weaknesses: winningModel.weaknesses,
+        mistakes: winningModel.mistakes,
+        optimizedPrompt: winningModel.optimizedPrompt,
       },
       { status: 200 }
     );
   } catch (error) {
-    console.error("Error in /api/analyze:", error);
+    console.error("Unexpected error in /api/analyze:", error);
     return Response.json(
       { error: error?.message || "An unexpected server error occurred." },
       { status: 500 }
