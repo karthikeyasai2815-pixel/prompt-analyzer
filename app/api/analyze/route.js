@@ -97,6 +97,26 @@ function sanitizeWeaknesses(list, fallback = ["Missing explicit constraints and 
   return fallback;
 }
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function isOverloadedOrRateLimited(err) {
+  if (!err) return false;
+  const status = err.status || err.statusCode || err.response?.status;
+  if (status === 503 || status === 429) return true;
+  const msg = String(err.message || err).toLowerCase();
+  return (
+    msg.includes("503") ||
+    msg.includes("429") ||
+    msg.includes("overloaded") ||
+    msg.includes("high demand") ||
+    msg.includes("rate limit") ||
+    msg.includes("resource has been exhausted") ||
+    msg.includes("resource_exhausted") ||
+    msg.includes("temporarily unavailable") ||
+    msg.includes("service unavailable")
+  );
+}
+
 export async function POST(req) {
   try {
     let body;
@@ -131,9 +151,10 @@ export async function POST(req) {
       );
     }
 
-    // Supported modern Gemini models: gemini-3.8-flash (active model specified by Gemini API), followed by gemini-flash-latest
+    // Active fallback list: gemini-3.8-flash, gemini-3.5-flash-lite, gemini-flash-latest
     const modelsToTry = [
       "gemini-3.8-flash",
+      "gemini-3.5-flash-lite",
       "gemini-flash-latest",
     ];
 
@@ -142,12 +163,15 @@ export async function POST(req) {
 
     const userPromptPayload = `Analyze and optimize this raw prompt across Gemini, ChatGPT, and Claude:\n\n"""\n${trimmedPrompt}\n"""\n\nGenerate the three model-specific prompt optimizations (Gemini concise & context-rich; ChatGPT clear persona & bulleted rules; Claude structured with <instructions> and <context> XML tags), individual quality scores, weaknesses, and select the Best Overall Prompt winner. Return strict JSON.`;
 
-    // 1. First try using current official @google/genai SDK
-    try {
-      const ai = new GoogleGenAI({ apiKey });
+    // Loop through fallback models with automatic 503/429 retry
+    for (let i = 0; i < modelsToTry.length; i++) {
+      const modelName = modelsToTry[i];
+      try {
+        let responseText = null;
 
-      for (const modelName of modelsToTry) {
+        // Try official @google/genai SDK
         try {
+          const ai = new GoogleGenAI({ apiKey });
           const response = await ai.models.generateContent({
             model: modelName,
             contents: userPromptPayload,
@@ -157,32 +181,14 @@ export async function POST(req) {
               temperature: 0.2,
             },
           });
-
-          const responseText = response?.text;
-          if (responseText) {
-            const cleaned = cleanJsonText(responseText);
-            parsedResult = JSON.parse(cleaned);
-            if (parsedResult && parsedResult.models && parsedResult.best) {
-              break;
-            }
+          responseText = response?.text;
+        } catch (genAiErr) {
+          // If high demand / rate limited, rethrow immediately to trigger 1s wait and next model
+          if (isOverloadedOrRateLimited(genAiErr)) {
+            throw genAiErr;
           }
-        } catch (err) {
-          lastError = err;
-          console.warn(`@google/genai attempt with ${modelName} failed:`, err.message);
-          continue;
-        }
-      }
-    } catch (sdkErr) {
-      lastError = sdkErr;
-      console.warn("@google/genai client initialization error:", sdkErr.message);
-    }
-
-    // 2. Resilient fallback using @google/generative-ai if needed
-    if (!parsedResult || !parsedResult.models) {
-      const genAI = new GoogleGenerativeAI(apiKey);
-
-      for (const modelName of modelsToTry) {
-        try {
+          // Otherwise try @google/generative-ai SDK as alternative fallback caller
+          const genAI = new GoogleGenerativeAI(apiKey);
           const model = genAI.getGenerativeModel({
             model: modelName,
             generationConfig: {
@@ -191,32 +197,47 @@ export async function POST(req) {
             },
             systemInstruction: SYSTEM_INSTRUCTION,
           });
-
           const result = await model.generateContent(userPromptPayload);
-          const responseText = result.response.text();
+          responseText = result.response.text();
+        }
+
+        if (responseText) {
           const cleaned = cleanJsonText(responseText);
           parsedResult = JSON.parse(cleaned);
-
           if (parsedResult && parsedResult.models && parsedResult.best) {
+            // Succeeded with this model
             break;
           }
-        } catch (err) {
-          lastError = err;
-          console.warn(`@google/generative-ai fallback with ${modelName} failed:`, err.message);
-          continue;
+        }
+      } catch (err) {
+        lastError = err;
+        const isTemporary = isOverloadedOrRateLimited(err);
+        console.warn(
+          `Gemini model ${modelName} failed (${isTemporary ? "503/429 high demand" : err.message}).`
+        );
+
+        // If 503 (high demand/overloaded) or 429, wait 1 second before trying the next model
+        if (isTemporary && i < modelsToTry.length - 1) {
+          console.warn(
+            `Waiting 1s before attempting next fallback model (${modelsToTry[i + 1]})...`
+          );
+          await sleep(1000);
         }
       }
     }
 
+    // Only return an error if all models in the fallback list fail
     if (!parsedResult || !parsedResult.models) {
-      console.error("Gemini optimization error:", lastError);
+      console.error("All Gemini fallback models failed:", lastError);
+      const isOverload = isOverloadedOrRateLimited(lastError);
       return Response.json(
         {
-          error:
-            lastError?.message ||
-            "Failed to analyze and optimize prompt with Gemini. Please verify your GEMINI_API_KEY and model access.",
+          error: isOverload
+            ? "Gemini models are currently experiencing high demand. Please try again in a few moments."
+            : lastError?.message ||
+              "Failed to analyze and optimize prompt. All fallback models failed.",
         },
-        { status: 502 }
+        { status: isOverload ? 503 : 502 }
       );
     }
 
