@@ -131,11 +131,10 @@ export async function POST(req) {
       );
     }
 
-    // Supported modern Gemini models: gemini-2.5-flash primary, followed by gemini-flash-latest and gemini-2.0-flash
+    // Supported modern Gemini models: gemini-3.8-flash (active model specified by Gemini API), followed by gemini-flash-latest
     const modelsToTry = [
-      "gemini-2.5-flash",
+      "gemini-3.8-flash",
       "gemini-flash-latest",
-      "gemini-2.0-flash",
     ];
 
     let lastError = null;
